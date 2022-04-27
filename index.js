@@ -102,7 +102,10 @@ async function putOpts() {
         noDotHtml: document.getElementById('noDotHtml').checked || false,
         put: document.getElementById('put').checked || false,
         overWrite: document.getElementById('overWrite').checked || false,
-        delete: document.getElementById('delete').checked || false
+        delete: document.getElementById('delete').checked || false,
+        spa: document.getElementById('spa').checked || false,
+        noDirectoryListing: document.getElementById('noDirectoryListing').checked || false,
+        rewriteTo: document.getElementById('rewriteTo').value || '/index.html'
     })
 }
 
@@ -110,7 +113,11 @@ async function submitPressed(files, zip) {
     if (window.processing) return;
     window.processing = true;
     await putOpts();
-    if (!files.length && !zip) return;
+    if (!files.length && !zip) {
+        document.getElementById('message').innerHTML = 'files set!';
+        window.processing = false;
+        window.location.href = '/';
+    };
     await resetDB('userSiteFiles');
     document.getElementById('message').innerHTML = 'Getting directory listing template';
     var htmlTemplate = await (await fetch('directory-listing-template.html?bypass=1', {redirect: "follow"})).text();
@@ -143,6 +150,7 @@ async function submitPressed(files, zip) {
     }
     document.getElementById('message').innerHTML = 'files set!';
     window.processing = false;
+    window.location.href = '/';
 }
 
 async function processFiles(files, basePath) {
@@ -176,7 +184,6 @@ async function processFiles(files, basePath) {
     await put('fileTree?', getFileTree(paths));
     await put('paths?', paths);
     await putOpts();
-    window.location.href = '/';
 }
 
 function humanFileSize(bytes) {
@@ -205,8 +212,18 @@ async function setSize() {
     }
 }
 
+function visibilityDependency(id1, id2) {
+    id1 = document.getElementById(id1);
+    id2 = document.getElementById(id2);
+    id2.parentElement.style.display = id1.checked?"block":"none";
+    id1.addEventListener('change', function() {
+        id2.parentElement.style.display = id1.checked?"block":"none";
+    })
+}
+
 window.addEventListener('DOMContentLoaded', async function() {
     var opts = await get('opts?');
+    if (!opts) opts = {};
     for (var k in opts) {
         if (opts[k] && document.getElementById(k)) {
             document.getElementById(k).checked = true;

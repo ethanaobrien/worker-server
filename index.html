@@ -17,10 +17,20 @@
             <label for="noDotHtml"> Exclude .html extension</label><br>
             <input type="checkbox" id="put" name="put">
             <label for="put"> Allow PUT request</label><br>
-            <input type="checkbox" id="overWrite" name="overWrite">
-            <label for="overWrite"> Allow overwriting existing files</label><br>
+            <div style="margin-left:20px;">
+                <input type="checkbox" id="overWrite" name="overWrite">
+                <label for="overWrite"> Allow overwriting existing files</label><br>
+            </div>
             <input type="checkbox" id="delete" name="delete">
             <label for="delete"> Allow DELETE request</label><br>
+            <input type="checkbox" id="noDirectoryListing" name="noDirectoryListing">
+            <label for="noDirectoryListing"> No directory listing</label><br>
+            <input type="checkbox" id="spa" name="spa">
+            <label for="spa"> Single Page App</label><br>
+            <div style="margin-left:20px;">
+                <label for="rewriteTo"> Rewrite To (for spa)</label>
+                <input type="text" id="rewriteTo" name="rewriteTo"><br>
+            </div>
             <br>
             <button id="submit">Submit</button>
             <p>No files will be uploaded to the server</p>
@@ -29,11 +39,13 @@
             <button id="clear">Clear storage</button><br><br>
             <a href="/">Go to site</a>
             <br>
-            <p>Worker Server Version 1.0</p>
+            <p>Worker Server Version 1.1</p>
         </div>
         <script>
             (async function() {
                 if ("serviceWorker" in navigator) {
+                    visibilityDependency('put', 'overWrite');
+                    visibilityDependency('spa', 'rewriteTo');
                     navigator.serviceWorker.register("worker.js?bypass=1");
                     navigator.serviceWorker.addEventListener('message', function(e) {
                         var data = e.data;

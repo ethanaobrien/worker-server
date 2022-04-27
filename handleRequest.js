@@ -62,6 +62,9 @@ async function handleRequest(e) {
     }
     var opts = await get('opts?');
     if (!opts) opts = {};
+    if (opts.spa && !path.match(/.*\.[\d\w]+$/)) {
+        path = opts.rewriteTo || '/index.html';
+    }
     var method = e.request.method.toLowerCase();
     if (method === 'put' && opts.put) {
         if (!opts.overWrite) {
@@ -146,6 +149,8 @@ async function handleRequest(e) {
             return notFound(method);
         } else if (cd.resp) {
             return cd.res;
+        } else if (opts.noDirectoryListing) {
+            return notFound(method);
         }
         var files = cd.children;
         files.sort(function(a, b) {
