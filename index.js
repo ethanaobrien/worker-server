@@ -137,7 +137,14 @@ async function submitPressed(files, zip) {
         var i = 0;
         for (var k in files) i++;
         var j = 0;
+        var start = '';
         for (var k in files) {
+            if (j === 0 && files[k].name.includes('/')) {
+                start = files[k].name.split('/')[0];
+            }
+            if (start && files[k].name.split('/')[0] !== start) {
+                start = '';
+            }
             j++;
             if (files[k].dir) continue;
             document.getElementById('message').innerHTML = 'unpacking zip '+j+'/'+i;
@@ -146,7 +153,7 @@ async function submitPressed(files, zip) {
                 data: await files[k].async('ArrayBuffer')
             });
         }
-        processFiles(filez, '');
+        await processFiles(filez, start);
     }
     document.getElementById('message').innerHTML = 'files set!';
     window.processing = false;
@@ -241,5 +248,39 @@ window.addEventListener('DOMContentLoaded', async function() {
                 await setSize();
             }
         })
+    }
+    if (document.getElementById('dlAllFiles')) {
+        const message = document.getElementById('message');
+        document.getElementById('dlAllFiles').addEventListener('click', async function() {
+            if (window.processing) return;
+            window.processing = true;
+            message.innerHTML = 'starting...';
+            var paths = await get('paths?');
+            var zip = new JSZip();
+            for (var i=0; i<paths.length; i++) {
+                message.innerHTML = 'Zipping Files '+i+'/'+paths.length;
+                zip.file(paths[i], (await get(paths[i])).data);
+            }
+            var blob = await zip.generateAsync({type: "blob"}, function(e) {
+                message.innerHTML = "Zipping Files: "+e.percent.toFixed(2)+"%";
+            });
+            var a = document.createElement('a');
+            a.download = 'site.zip';
+            a.href = URL.createObjectURL(blob);
+            a.click();
+            message.innerHTML = "Zip downloaded";
+            setTimeout(function() {
+                URL.revokeObjectURL(a.href);
+                message.innerHTML = "Service worker ready";
+            }, 5000)
+            window.processing = false;
+        })
+    }
+})
+
+window.addEventListener('beforeunload', function(e) {
+    if (window.processing) {
+        e.preventDefault();
+        return e.returnValue = "You may loose data if you exit now";
     }
 })
