@@ -1,0 +1,69 @@
+<html>
+    <head>
+        <title>Worker Server</title>
+        <link rel="icon" type="image/x-icon" href="/favicon.ico?bypass=1">
+        <script src="mime.js?bypass=1"></script>
+        <script src="jszip.js?bypass=1"></script>
+        <script src="index.js?bypass=1"></script>
+    </head>
+    <body>
+        <noscript>This project requires javascript to work!</noscript>
+        <div style="padding: 20px;" id="main">
+            Choose Directory: <input type="file" webkitdirectory multiple id="files"><br><br>
+            Choose Zip: <input type="file" id="zip"><br><br>
+            <input type="checkbox" id="index" name="index">
+            <label for="index"> Auto render index.html</label><br>
+            <input type="checkbox" id="noDotHtml" name="noDotHtml">
+            <label for="noDotHtml"> Exclude .html extension</label><br>
+            <input type="checkbox" id="put" name="put">
+            <label for="put"> Allow PUT request</label><br>
+            <input type="checkbox" id="overWrite" name="overWrite">
+            <label for="overWrite"> Allow overwriting existing files</label><br>
+            <input type="checkbox" id="delete" name="delete">
+            <label for="delete"> Allow DELETE request</label><br>
+            <br>
+            <button id="submit">Submit</button>
+            <p>No files are uploaded to the server</p>
+            <p id="message">Loading...</p>
+            <p id="size">Loading...</p>
+            <button id="clear">Clear storage</button><br><br>
+            <a href="/">Go to site</a>
+            <br>
+            <p>Worker Server Version 1.0</p>
+        </div>
+        <script>
+            (async function() {
+                if ("serviceWorker" in navigator) {
+                    navigator.serviceWorker.register("worker.js?bypass=1");
+                    navigator.serviceWorker.addEventListener('message', function(e) {
+                        var data = e.data;
+                        document.getElementById('message').innerHTML = data;
+                    })
+                    var registration = await navigator.serviceWorker.ready;
+                    document.getElementById('submit').addEventListener('click', function(e) {
+                        registration.active.postMessage('Processing files');
+                        submitPressed(document.getElementById('files').files, document.getElementById('zip').files[0]);
+                    })
+                    registration.active.postMessage('Service worker ready');
+                    await registration.sync.register('sync');
+                    var urlParams = new URLSearchParams(window.location.href);
+                    var zip = urlParams.get('zip');
+                    if (zip) {
+                        registration.active.postMessage('Downloading zip');
+                        zip = decodeURIComponent(zip);
+                        try {
+                            var res = await fetch(zip+'?bypass=1', {redirect: "follow"});
+                            if (!res.ok) throw new Error('not ok');
+                            submitPressed([], await res.arrayBuffer());
+                        } catch(e) {
+                            console.warn(e);
+                            registration.active.postMessage('Error downloading zip (does the resource have cors headers?)');
+                        }
+                    }
+                } else {
+                    document.getElementById('main').innerHTML = '<p>Service workers not avaliable (are you on an https page?)</p>';
+                };
+            })();
+        </script>
+    </body>
+</html>
