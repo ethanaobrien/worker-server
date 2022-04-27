@@ -66,7 +66,10 @@ function getFileTree(paths) {
                 a[i].isFile = false;
                 a[i].isDirectory = true;
                 a[i].children = process(a[i].children);
-                a[i].path = a[i].path.substring(0, a[i].path.length-a[i].path.split('/'+a[i].name+'/').pop().length);
+                var q = a[i].path.length-a[i].path.split('/'+a[i].name+'/');
+                var v = a[i].path.split('/');
+                var q = v.lastIndexOf(a[i].name);
+                a[i].path = a[i].path.substring(0, a[i].path.length-v.slice(q+1).join('/').length);
                 if (a[i].name === '') {
                     a[i].path = '/';
                     a[i].name = '/';
@@ -138,7 +141,14 @@ async function submitPressed(files, zip) {
         var i = 0;
         for (var k in files) i++;
         var j = 0;
+        var start = '';
         for (var k in files) {
+            if (j === 0 && files[k].name.includes('/')) {
+                start = files[k].name.split('/')[0];
+            }
+            if (start && files[k].name.split('/')[0] !== start) {
+                start = '';
+            }
             j++;
             if (files[k].dir) continue;
             document.getElementById('message').innerHTML = 'unpacking zip '+j+'/'+i;
@@ -147,7 +157,8 @@ async function submitPressed(files, zip) {
                 data: await files[k].async('ArrayBuffer')
             });
         }
-        await processFiles(filez, '');
+        if (start) start='/'+start;
+        await processFiles(filez, start);
     }
     document.getElementById('message').innerHTML = 'files set!';
     window.processing = false;
@@ -155,7 +166,7 @@ async function submitPressed(files, zip) {
 }
 
 async function processFiles(files, basePath) {
-    var paths = await get('paths?', paths);
+    var paths = await get('paths?');
     if (!paths) paths = [];
     for (var i=0; i<files.length; i++) {
         document.getElementById('message').innerHTML = 'Processing files '+i+'/'+files.length;
@@ -186,6 +197,8 @@ async function processFiles(files, basePath) {
     await put('paths?', paths);
     await putOpts();
 }
+
+//javascript:(async function() {window.open(URL.createObjectURL(new Blob([JSON.stringify(await get('fileTree?'), null, 2)])))})();
 
 function humanFileSize(bytes) {
     if (! bytes) {
