@@ -117,6 +117,7 @@ async function submitPressed(files, zip) {
         document.getElementById('message').innerHTML = 'files set!';
         window.processing = false;
         window.location.href = '/';
+        return;
     };
     await resetDB('userSiteFiles');
     document.getElementById('message').innerHTML = 'Getting directory listing template';
@@ -137,14 +138,7 @@ async function submitPressed(files, zip) {
         var i = 0;
         for (var k in files) i++;
         var j = 0;
-        var start = '';
         for (var k in files) {
-            if (j === 0 && files[k].name.includes('/')) {
-                start = files[k].name.split('/')[0];
-            }
-            if (start && files[k].name.split('/')[0] !== start) {
-                start = '';
-            }
             j++;
             if (files[k].dir) continue;
             document.getElementById('message').innerHTML = 'unpacking zip '+j+'/'+i;
@@ -153,7 +147,7 @@ async function submitPressed(files, zip) {
                 data: await files[k].async('ArrayBuffer')
             });
         }
-        await processFiles(filez, start);
+        await processFiles(filez, '');
     }
     document.getElementById('message').innerHTML = 'files set!';
     window.processing = false;
@@ -232,10 +226,14 @@ window.addEventListener('DOMContentLoaded', async function() {
     var opts = await get('opts?');
     if (!opts) opts = {};
     for (var k in opts) {
-        if (opts[k] && document.getElementById(k)) {
+        if (opts[k] && document.getElementById(k) && typeof opts[k] != 'string') {
             document.getElementById(k).checked = true;
+        } else if (opts[k] && document.getElementById(k) && typeof opts[k] == 'string') {
+            document.getElementById(k).value = opts[k];
         }
     }
+    visibilityDependency('put', 'overWrite');
+    visibilityDependency('spa', 'rewriteTo');
     await setSize();
     if (document.getElementById('clear')) {
         document.getElementById('clear').addEventListener('click', async function(e) {

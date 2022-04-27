@@ -40,13 +40,11 @@
             <button id="clear">Clear storage</button><br><br>
             <a href="/">Go to site</a>
             <br>
-            <p>Worker Server Version 1.2</p>
+            <p>Worker Server Version 1.3</p>
         </div>
         <script>
             (async function() {
                 if ("serviceWorker" in navigator) {
-                    visibilityDependency('put', 'overWrite');
-                    visibilityDependency('spa', 'rewriteTo');
                     navigator.serviceWorker.register("worker.js?bypass=1");
                     navigator.serviceWorker.addEventListener('message', function(e) {
                         var data = e.data;
