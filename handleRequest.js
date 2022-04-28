@@ -62,8 +62,10 @@ async function handleRequest(e) {
     }
     var opts = await get('opts?');
     if (!opts) opts = {};
+    var spa = false;
     if (opts.spa && !path.match(/.*\.[\d\w]+$/)) {
         path = opts.rewriteTo || '/index.html';
+        spa = true;
     }
     var method = e.request.method.toLowerCase();
     if (method === 'put' && opts.put) {
@@ -115,14 +117,14 @@ async function handleRequest(e) {
         });
     }
     var res;
-    if (opts.noDotHtml && !path.endsWith('/')) {
+    if (opts.noDotHtml && !path.endsWith('/') && !spa) {
         var t = await get(path+'.html');
         if (t) res = t;
     }
     if (!res) {
         res = await get(path);
     }
-    if (path.endsWith('/') && opts.index && !res) {
+    if (path.endsWith('/') && opts.index && !res && !spa) {
         var y = await get(path+'index.html');
         if (y) res = y;
     }
@@ -208,7 +210,7 @@ async function handleRequest(e) {
             status: 200
         });
     }
-    if (opts.noDotHtml && path.endsWith('.html')) {
+    if (opts.noDotHtml && path.endsWith('.html') && !spa) {
         var newpath = path.substring(0, path.length-5)+url.search;
         return new Response('', {headers: {'location':newpath,'content-length':0}, status: 307});
     }
