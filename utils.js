@@ -103,7 +103,10 @@ function getFileTree(paths) {
                 a[i].isFile = false;
                 a[i].isDirectory = true;
                 a[i].children = process(a[i].children);
-                a[i].path = a[i].path.substring(0, a[i].path.length-a[i].path.split('/'+a[i].name+'/').pop().length);
+                var q = a[i].path.length-a[i].path.split('/'+a[i].name+'/');
+                var v = a[i].path.split('/');
+                var q = v.lastIndexOf(a[i].name);
+                a[i].path = a[i].path.substring(0, a[i].path.length-v.slice(q+1).join('/').length);
                 if (a[i].name === '') {
                     a[i].path = '/';
                     a[i].name = '/';
