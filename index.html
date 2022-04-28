@@ -78,7 +78,7 @@
                                 xhr.open("GET", zip+'?bypass=1');
                                 xhr.onprogress = function(e) {
                                     if (e.total && e.total > 0) {
-                                        document.getElementById('message').innerHTML = 'Downloading zip '+(e.total/e.loaded).toFixed(2)+'%';
+                                        document.getElementById('message').innerHTML = 'Downloading zip '+((e.total/e.loaded)*100).toFixed(2)+'%';
                                     } else {
                                         document.getElementById('message').innerHTML = 'Downloading zip '+humanFileSize(e.loaded);
                                     }
