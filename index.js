@@ -108,7 +108,8 @@ async function putOpts() {
         delete: document.getElementById('delete').checked || false,
         spa: document.getElementById('spa').checked || false,
         noDirectoryListing: document.getElementById('noDirectoryListing').checked || false,
-        rewriteTo: document.getElementById('rewriteTo').value || '/index.html'
+        rewriteTo: document.getElementById('rewriteTo').value || '/index.html',
+        rewriteRegex: document.getElementById('rewriteRegex').value || '.*\\.[\d\\w]+$'
     })
 }
 
@@ -160,6 +161,7 @@ async function submitPressed(files, zip) {
         if (start) start='/'+start;
         await processFiles(filez, start);
     }
+    await putOpts();
     document.getElementById('message').innerHTML = 'files set!';
     window.processing = false;
     window.location.href = '/';
@@ -195,7 +197,6 @@ async function processFiles(files, basePath) {
     document.getElementById('message').innerHTML = 'Processing file tree';
     await put('fileTree?', getFileTree(paths));
     await put('paths?', paths);
-    await putOpts();
 }
 
 //javascript:(async function() {window.open(URL.createObjectURL(new Blob([JSON.stringify(await get('fileTree?'), null, 2)])))})();
@@ -228,10 +229,10 @@ async function setSize() {
 
 function visibilityDependency(id1, id2) {
     id1 = document.getElementById(id1);
-    id2 = document.getElementById(id2);
-    id2.parentElement.style.display = id1.checked?"block":"none";
+    id2 = document.getElementById(id2).parentElement;
+    id2.style.display = id1.checked?"block":"none";
     id1.addEventListener('change', function() {
-        id2.parentElement.style.display = id1.checked?"block":"none";
+        id2.style.display = id1.checked?"block":"none";
     })
 }
 

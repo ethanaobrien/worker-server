@@ -17,7 +17,7 @@
             <label for="noDotHtml"> Exclude .html extension</label><br>
             <input type="checkbox" id="put" name="put">
             <label for="put"> Allow PUT request</label><br>
-            <div style="margin-left:20px;">
+            <div style="margin-left:20px;display:none;">
                 <input type="checkbox" id="overWrite" name="overWrite">
                 <label for="overWrite"> Allow overwriting existing files</label><br>
             </div>
@@ -27,21 +27,22 @@
             <label for="noDirectoryListing"> No directory listing</label><br>
             <input type="checkbox" id="spa" name="spa">
             <label for="spa"> Single Page App</label><br>
-            <div style="margin-left:20px;">
+            <div style="margin-left:20px;display:none;">
                 <label for="rewriteTo"> Rewrite To (for spa)</label>
-                <input type="text" id="rewriteTo" name="rewriteTo"><br>
+                <input type="text" id="rewriteTo" name="rewriteTo" value="/index.html" autocomplete="off"><br>
+                <label for="rewriteRegex"> Rewrite Regex</label>
+                <input type="text" id="rewriteRegex" name="rewriteRegex" value=".*\.[\d\w]+$" autocomplete="off"><br>
             </div>
             <br>
             <button id="submit">Submit</button><br><br>
             <button id="dlAllFiles">Download all Files</button>
-            <p>No files will be uploaded to the server</p>
+            <p>No files will be uploaded to the server. All files are kept locally.</p>
             <p id="message">Loading...</p>
             <p id="size">Loading...</p>
             <button id="clear">Clear storage</button><br><br>
             <a href="/">Go to site</a>
-            <br>
-            <p>Worker Server Version 1.4</p>
         </div>
+        <p style="margin-left: 20px;"><a href="https://github.com/ethanaobrien/worker-server">Worker Server</a> Version 1.5</p>
         <script>
             (async function() {
                 if ("serviceWorker" in navigator) {
@@ -57,15 +58,45 @@
                     })
                     registration.active.postMessage('Service worker ready');
                     await registration.sync.register('sync');
-                    var urlParams = new URLSearchParams(window.location.href);
+                    var urlParams = new URLSearchParams(window.location.search);
                     var zip = urlParams.get('zip');
                     if (zip) {
                         registration.active.postMessage('Downloading zip');
                         zip = decodeURIComponent(zip);
                         try {
-                            var res = await fetch(zip+'?bypass=1', {redirect: "follow"});
-                            if (!res.ok) throw new Error('not ok');
-                            submitPressed([], await res.arrayBuffer());
+                            var res = await new Promise(function(resolve, reject) {
+                                var xhr = new XMLHttpRequest();
+                                xhr.responseType = "arraybuffer";
+                                xhr.onload = function(e) {
+                                    var status = xhr.status;
+                                    if (status === 0 || (status >= 200 && status < 300)) {
+                                        resolve(xhr.response)
+                                    } else {
+                                        reject();
+                                    }
+                                }
+                                xhr.open("GET", zip+'?bypass=1');
+                                xhr.onprogress = function(e) {
+                                    if (e.total && e.total > 0) {
+                                        document.getElementById('message').innerHTML = 'Downloading zip '+(e.total/e.loaded).toFixed(2)+'%';
+                                    } else {
+                                        document.getElementById('message').innerHTML = 'Downloading zip '+humanFileSize(e.loaded);
+                                    }
+                                }
+                                xhr.send();
+                            })
+                            await submitPressed([], res);
+                            await put('opts?', {
+                                index: urlParams.has('index') || false,
+                                noDotHtml: urlParams.has('noDotHtml') || false,
+                                put: urlParams.has('put') || false,
+                                overWrite: urlParams.has('overWrite') || false,
+                                delete: urlParams.has('delete') || false,
+                                spa: urlParams.has('spa') || false,
+                                noDirectoryListing: urlParams.has('noDirectoryListing') || false,
+                                rewriteTo: (urlParams.has('rewriteTo')&&decodeURIComponent(urlParams.get('rewriteTo'))) || '/index.html',
+                                rewriteRegex: (urlParams.has('rewriteRegex')&&decodeURIComponent(urlParams.get('rewriteRegex'))) || '.*\\.[\d\\w]+$'
+                            })
                         } catch(e) {
                             console.warn(e);
                             registration.active.postMessage('Error downloading zip (does the resource have cors headers?)');

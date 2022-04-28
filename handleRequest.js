@@ -23,6 +23,7 @@ async function normalRequest(request) {
         if (path === '/') path = '/index.html';
         var cache = await cache.match(path+'?bypass=1');
         if (cache) return cache;
+        if (res) return res;
         return notFound(request.method);
     }
 }
@@ -63,7 +64,9 @@ async function handleRequest(e) {
     var opts = await get('opts?');
     if (!opts) opts = {};
     var spa = false;
-    if (opts.spa && !path.match(/.*\.[\d\w]+$/)) {
+    if (opts.spa &&
+        ((opts.rewriteRegex && !path.match(new RegExp(opts.rewriteRegex))) ||
+        (!opts.rewriteRegex && !path.match(/.*\.[\d\w]+$/)))) {
         path = opts.rewriteTo || '/index.html';
         spa = true;
     }
@@ -179,7 +182,7 @@ async function handleRequest(e) {
             }
             html.push('<ul>');
             for (var i = 0; i<files.length; i++) {
-                var name = files[i].name.htmlEscape();
+                var name = files[i].name.htmlEscape().replaceAll('\\', '\\\\').replaceAll('"', '\\"');
                 if (files[i].isDirectory) {
                     html.push('<li class="directory"><a href="'+name+'/?static=1">'+name+'</a></li>');
                 } else {
