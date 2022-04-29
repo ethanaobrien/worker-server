@@ -2,13 +2,6 @@ importScripts('mime.js?bypass=1');
 importScripts('utils.js?bypass=1');
 importScripts('handleRequest.js?bypass=1');
 
-/*
-Todo
-Load zip from url support
-Import from github?
-Export zip
-*/
-
 addEventListener('message', function(e) {
     e.source.postMessage(e.data);
 });
@@ -29,7 +22,9 @@ addEventListener('install', function(e) {
                 '/mime.js?bypass=1',
                 '/worker.js?bypass=1',
                 '/jszip.js?bypass=1',
-                '/favicon.ico?bypass=1'
+                '/codemirror.css?bypass=1',
+                '/codemirror.min.js?bypass=1',
+                '/editor.html?bypass=1'
             ]);
         })()
     );
