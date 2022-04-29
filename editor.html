@@ -42,7 +42,7 @@
                         if (type && default_types.includes(type)) {
                             type += '; charset=utf-8';
                         }
-                        file = {type: type || 'text/plain'}
+                        file = {type: type || ''}
                         file.data = await (new Blob([''])).arrayBuffer();
                         await put(path, file);
                         var paths = await get('paths?');

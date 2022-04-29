@@ -90,7 +90,7 @@ async function handleRequest(e) {
         }
         var data = {
             data: await e.request.arrayBuffer(),
-            type: type || 'text/plain'
+            type: type || ''
         }
         await updateTree(path);
         await put(path, data);
@@ -218,10 +218,10 @@ async function handleRequest(e) {
         return new Response('', {headers: {'location':newpath,'content-length':0}, status: 307});
     }
     var headers = {
-        'content-type': res.type,
         'accept-ranges': 'bytes',
         'content-length': res.data.byteLength
     };
+    if (res.type) headers['content-type'] = res.type;
     var code = 200;
     var data = res.data;
     if (e.request.headers['range']) {

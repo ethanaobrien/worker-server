@@ -185,7 +185,7 @@ async function processFiles(files, basePath) {
             type += '; charset=utf-8';
         }
         var data = {
-            type: type || 'text/plain'
+            type: type || ''
         }
         if (files[i].data) {
             data.data = files[i].data;
