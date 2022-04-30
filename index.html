@@ -57,7 +57,7 @@
                     var registration = await navigator.serviceWorker.ready;
                     document.getElementById('submit').addEventListener('click', function(e) {
                         registration.active.postMessage('Processing files');
-                        submitPressed(document.getElementById('files').files, document.getElementById('zip').files[0]);
+                        submitPressed(document.getElementById('files').files, document.getElementById('zip').files[0], document.getElementById('deleteExisting').checked);
                     })
                     registration.active.postMessage('Service worker ready');
                     await registration.sync.register('sync');
