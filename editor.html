@@ -81,6 +81,7 @@
                         tabSize: 4,
                         indentUnit: 4,
                         matchBrackets: true,
+                        lineWrapping: true,
                         mode:  file.type.split(';')[0]
                     });
                     editor.setSize("90%", "90%");
@@ -99,7 +100,7 @@
                 }
                 document.getElementById('save').addEventListener('click', save);
                 document.addEventListener('keydown', function(e) {
-                    if (!['tab', 'meta', 'shift', 'control', 'alt', 'escape'].includes(e.key.toLowerCase()) && !e.key.toLowerCase().includes('arrow')) {
+                    if (!['tab', 'meta', 'shift', 'control', 'alt', 'escape'].includes(e.key.toLowerCase()) && !e.key.toLowerCase().includes('arrow') && !e.ctrlKey) {
                         document.getElementById('save').innerText = 'Save*';
                         window.unsaved = true;
                     }

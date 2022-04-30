@@ -113,7 +113,7 @@ async function putOpts() {
     })
 }
 
-async function submitPressed(files, zip) {
+async function submitPressed(files, zip, deleteExisting) {
     if (window.processing) return;
     window.processing = true;
     await putOpts();
@@ -123,13 +123,14 @@ async function submitPressed(files, zip) {
         window.location.href = '/';
         return;
     };
-    await resetDB('userSiteFiles');
+    if (deleteExisting !== true) await resetDB('userSiteFiles');
     document.getElementById('message').innerHTML = 'Getting directory listing template';
     var htmlTemplate = await (await fetch('directory-listing-template.html?bypass=1', {redirect: "follow"})).text();
     await put('htmlTemplate?', htmlTemplate);
     if (files.length) {
         await processFiles(files, files[0].webkitRelativePath.split('/')[0]);
-    } else if (zip) {
+    }
+    if (zip) {
         document.getElementById('message').innerHTML = 'unpacking zip';
         var z = new JSZip();
         try {

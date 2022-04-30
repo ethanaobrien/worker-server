@@ -33,6 +33,8 @@
                 <label for="rewriteRegex"> Rewrite Regex</label>
                 <input type="text" id="rewriteRegex" name="rewriteRegex" value=".*\.[\d\w]+$" autocomplete="off"><br>
             </div>
+            <input type="checkbox" id="deleteExisting" name="deleteExisting">
+            <label for="deleteExisting"> Do not delete existing files</label><br>
             <br>
             <button id="submit">Submit</button><br><br>
             <button id="dlAllFiles">Download all Files</button>
@@ -43,7 +45,7 @@
             <a href="/">Go to site</a><br><br>
             <a href="/editor.html?bypass=1">Go to code editor</a>
         </div>
-        <p style="margin-left: 20px;"><a href="https://github.com/ethanaobrien/worker-server">Worker Server</a> Version 1.5</p>
+        <p style="margin-left: 20px;"><a href="https://github.com/ethanaobrien/worker-server">Worker Server</a> Version 1.61</p>
         <script>
             (async function() {
                 if ("serviceWorker" in navigator) {
@@ -86,7 +88,7 @@
                                 }
                                 xhr.send();
                             })
-                            await submitPressed([], res);
+                            await submitPressed([], res, urlParams.has('deleteExisting'));
                             await put('opts?', {
                                 index: urlParams.has('index') || false,
                                 noDotHtml: urlParams.has('noDotHtml') || false,
