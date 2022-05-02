@@ -6,29 +6,82 @@
         <link rel="stylesheet" href="codemirror.css?bypass=1">
     </head>
     <body>
-        <button id="openFile">Open</button>
+        <button id="openFile" style="display:none;">Open</button>
         <button id="new">New</button>
         <button id="save" style="display:none;">Save</button>
+        <button id="close" style="display:none;">Close</button>
+        <button id="cancel" style="display:none;">Cancel</button>
         <a href="/">Go to site</a>
         <div id="openFiles" style="display:none;float:left;width:10%;padding:5px;"></div>
         <div id="fileEditor" style="display:none;padding:20px;"></div>
         <div id="fileTree" style="padding:20px;">loading...</div>
         <script>
             (async function() {
-                window.openFiles = [];
-                window.unsaved = false;
+                window.openFilesData = {};
                 document.getElementById('openFile').addEventListener('click', function(e) {
-                    delete window.editor;
-                    delete window.currentPath;
-                    document.getElementById('save').innerText = "Save";
-                    window.unsaved = false;
                     document.getElementById('save').style.display = 'none';
                     document.getElementById('fileEditor').style.display = 'none';
                     document.getElementById('openFiles').style.display = 'none';
+                    document.getElementById('close').style.display = 'none';
                     document.getElementById('fileTree').style.display = '';
+                    document.getElementById('cancel').style.display = '';
+                    document.getElementById('openFile').style.display = 'none';
                 })
+                document.getElementById('cancel').addEventListener('click', function(e) {
+                    document.getElementById('fileTree').style.display = 'none';
+                    document.getElementById('fileEditor').style.display = '';
+                    document.getElementById('openFiles').style.display = '';
+                    document.getElementById('save').style.display = '';
+                    document.getElementById('close').style.display = '';
+                    document.getElementById('openFile').style.display = '';
+                    document.getElementById('cancel').style.display = 'none';
+                })
+                window.rename = async function(path) {
+                    var newName = window.prompt('Enter new file name', path.split('/').pop());
+                    if (!newName) return;
+                    var newPath = path.substring(0, path.length-path.split('/').pop().length)+newName;
+                    await updateTree(path, true);
+                    var data = await get(path);
+                    await put(newPath, data);
+                    await deleteF(path);
+                    await updateTree(newPath);
+                    await loadTree();
+                }
+                window.deleteFile = async function(path) {
+                    if (!confirm('Are you sure you want to delete '+path.split('/').pop())) return;
+                    await updateTree(path, true);
+                    await deleteF(path);
+                    await loadTree();
+                }
                 window.chooseFile = async function(e, path) {
-                    if (window.unsaved && !confirm('You have unsaved changes. Are you sure you want to leave this file?')) return;
+                    if (!e&&!path) return;
+                    var ed = document.getElementById('fileEditor');
+                    for (var i=0; i<ed.children.length; i++) {
+                        ed.children[i].style.display = 'none';
+                    }
+                    document.getElementById('fileTree').style.display = 'none';
+                    document.getElementById('fileEditor').style.display = '';
+                    document.getElementById('openFiles').style.display = '';
+                    document.getElementById('openFile').style.display = '';
+                    document.getElementById('save').style.display = '';
+                    document.getElementById('close').style.display = '';
+                    document.getElementById('cancel').style.display = 'none';
+                    document.getElementById('save').innerText = "Save";
+                    if (path) {
+                        if (document.getElementById('editor:'+path)) {
+                            document.getElementById('editor:'+path).style.display = '';
+                            document.getElementById('save').innerText = window.openFilesData[path].saved ? "Save" : "Save*";
+                            window.currentPath = window.openFilesData[path];
+                            return;
+                        }
+                    } else {
+                        if (document.getElementById('editor:'+e.target.attributes.value.textContent)) {
+                            document.getElementById('editor:'+e.target.attributes.value.textContent).style.display = '';
+                            window.currentPath = window.openFilesData[e.target.attributes.value.textContent];
+                            document.getElementById('save').innerText = window.openFilesData[e.target.attributes.value.textContent].saved ? "Save" : "Save*";
+                            return;
+                        }
+                    }
                     var value;
                     if (path) {
                         if (!path.startsWith('/')) path='/'+path;
@@ -45,37 +98,25 @@
                         file = {type: type || ''}
                         file.data = await (new Blob([''])).arrayBuffer();
                         await put(path, file);
-                        var paths = await get('paths?');
-                        paths.push(path);
-                        await put('paths?', paths);
-                        await put('fileTree?', getFileTree(paths));
+                        await updateTree(path);
                         await loadTree();
                         value = path;
-                    } else if (!e&&!path) {
-                        return;
                     } else {
                         e.preventDefault();
                         value = e.target.attributes.value.textContent;
                     }
-                    if (!window.openFiles.includes(value)) {
-                        window.openFiles.push(value);
-                        var name = value.split('/').pop();
-                        if (name.length > 20) {
-                            name = name.substring(0, 17)+'...';
-                        }
-                        document.getElementById('openFiles').innerHTML += '<p><a style="text-decoration:none" href="javascript:void(0)" value="'+value+'" onclick="chooseFile(event);">'+name+'</a></p>';
+                    var name = value.split('/').pop();
+                    if (name.length > 20) {
+                        name = name.substring(0, 17)+'...';
                     }
-                    document.getElementById('fileEditor').innerHTML = "loading...";
-                    document.getElementById('fileTree').style.display = 'none';
-                    document.getElementById('fileEditor').style.display = '';
-                    document.getElementById('openFiles').style.display = '';
-                    document.getElementById('save').style.display = '';
-                    document.getElementById('save').innerText = "Save";
-                    window.unsaved = false;
+                    document.getElementById('openFiles').innerHTML += '<p id="'+value+'"><a style="text-decoration:none" href="javascript:void(0)" value="'+value+'" onclick="chooseFile(event);">'+name+'</a></p>';
+                    var div = document.createElement('div');
+                    div.id = 'editor:'+value;
+                    ed.appendChild(div);
+                    div.innerHTML = "loading...";
                     var file = await get(value);
-                    window.currentPath = {path:value,type:file.type};
-                    document.getElementById("fileEditor").innerHTML = "";
-                    window.editor = CodeMirror(document.getElementById("fileEditor"), {
+                    div.innerHTML = "";
+                    var editor = CodeMirror(div, {
                         value: new TextDecoder('utf-8').decode(file.data),
                         lineNumbers: true,
                         tabSize: 4,
@@ -85,24 +126,49 @@
                         mode:  file.type.split(';')[0]
                     });
                     editor.setSize("90%", "90%");
+                    window.currentPath = {
+                        path:value,
+                        type:file.type,
+                        saved:true,
+                        editor: editor
+                    };
+                    window.openFilesData[value] = window.currentPath;
                 }
                 document.getElementById('new').addEventListener('click', function(e) {
                     chooseFile(null, prompt('enter file path'))
                 })
+                function closeFile(path) {
+                    if (document.getElementById(path)) {
+                        document.getElementById(path).remove();
+                    }
+                    if (path === window.currentPath.path) {
+                        delete window.currentPath;
+                        if (document.getElementById('editor:'+path)) {
+                            document.getElementById('editor:'+path).remove();
+                        }
+                    }
+                    delete window.currentPath[path];
+                }
+                document.getElementById('close').addEventListener('click', function(e) {
+                    if (!window.currentPath) return;
+                    closeFile(window.currentPath.path);
+                })
                 async function save(e) {
-                    if (!window.editor || !window.currentPath) return;
+                    if (!window.currentPath) return;
                     document.getElementById('save').innerText = "Save";
-                    window.unsaved = false;
+                    window.openFilesData[window.currentPath.path].saved = true;
+                    window.currentPath.saved = true;
                     await put(window.currentPath.path, {
                         type: window.currentPath.type,
-                        data: toArrayBuffer(window.editor.getValue())
+                        data: toArrayBuffer(window.currentPath.editor.getValue())
                     })
                 }
                 document.getElementById('save').addEventListener('click', save);
                 document.addEventListener('keydown', function(e) {
-                    if (!['tab', 'meta', 'shift', 'control', 'alt', 'escape'].includes(e.key.toLowerCase()) && !e.key.toLowerCase().includes('arrow') && !e.ctrlKey) {
+                    if (!['tab', 'meta', 'shift', 'control', 'alt', 'escape'].includes(e.key.toLowerCase()) && !e.key.toLowerCase().includes('arrow') && !(e.ctrlKey || e.key.toLowerCase() === 'v')) {
                         document.getElementById('save').innerText = 'Save*';
-                        window.unsaved = true;
+                        window.openFilesData[window.currentPath.path].saved = false;
+                        window.currentPath.saved = true;
                     }
                     if (e.key === 's' && e.ctrlKey) {
                         save();
@@ -133,9 +199,9 @@
                                 processFiles(a[i].children);
                                 html += '</ul></li>';
                             } else {
-                                var mime = ['html', 'css', 'txt', 'js'];
+                                var mime = ['html', 'css', 'txt', 'js', 'md', 'htm', 'xhtm', 'xhtml', 'json'];
                                 if (mime.includes(a[i].name.split('.').pop().toLowerCase()) || !a[i].name.includes('.')) {
-                                    html += '<li><a style="text-decoration:none" href="javascript:void(0)" value="'+a[i].path+'" onclick="chooseFile(event);">'+a[i].name+'</a></li>';
+                                    html += '<li><a style="text-decoration:none" href="javascript:void(0)" value="'+a[i].path+'" onclick="chooseFile(event);">'+a[i].name+'</a> - <a href="javascript:void(0)" onclick="rename(\''+a[i].path.replaceAll('"', '\\"')+'\')">rename</a> - <a href="javascript:void(0)" onclick="deleteFile(\''+a[i].path.replaceAll("'", "\\'")+'\')">delete</a></li>';
                                 }
                             }
                         }
@@ -147,9 +213,14 @@
                 }
                 await loadTree();
                 window.addEventListener('beforeunload', function(e) {
-                    if (!window.unsaved) return;
+                    if (!window.currentPath) return;
+                    var saved = true;
+                    for (var k in window.openFilesData) {
+                        if (!window.openFilesData[k].saved) saved = false;
+                    }
+                    if (saved) return;
                     e.preventDefault();
-                    return e.returnValue = "You have unsaved changes. Are you sure you want to leave this file?";
+                    return e.returnValue = "You have unsaved changes.";
                 })
             })();
         </script>

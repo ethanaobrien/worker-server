@@ -40,20 +40,6 @@ function end(data, code) {
     });
 }
 
-async function updateTree(path, remove) {
-    var paths = await get('paths?');
-    if (remove !== true) {
-        if (paths.includes(path)) return;
-        paths.push(path);
-    } else {
-        var index = paths.indexOf(path);
-        if (index === -1) return;
-        paths.splice(index, 1);
-    }
-    await put('fileTree?', getFileTree(paths));
-    await put('paths?', paths);
-}
-
 async function handleRequest(e) {
     var url = new URL(e.request.url);
     var path = decodeURIComponent(url.pathname);

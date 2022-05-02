@@ -35,6 +35,8 @@
             </div>
             <input type="checkbox" id="deleteExisting" name="deleteExisting">
             <label for="deleteExisting"> Do not delete existing files</label><br>
+            <input type="checkbox" id="baseFolder" name="baseFolder">
+            <label for="baseFolder"> Put all files in base folder</label><br>
             <br>
             <button id="submit">Submit</button><br><br>
             <button id="dlAllFiles">Download all Files</button>
@@ -45,7 +47,7 @@
             <a href="/">Go to site</a><br><br>
             <a href="/editor.html?bypass=1">Go to code editor</a>
         </div>
-        <p style="margin-left: 20px;"><a href="https://github.com/ethanaobrien/worker-server">Worker Server</a> Version 1.61</p>
+        <p style="margin-left: 20px;"><a href="https://github.com/ethanaobrien/worker-server">Worker Server</a> Version 1.7</p>
         <script>
             (async function() {
                 if ("serviceWorker" in navigator) {
@@ -57,7 +59,7 @@
                     var registration = await navigator.serviceWorker.ready;
                     document.getElementById('submit').addEventListener('click', function(e) {
                         registration.active.postMessage('Processing files');
-                        submitPressed(document.getElementById('files').files, document.getElementById('zip').files[0], document.getElementById('deleteExisting').checked);
+                        submitPressed(document.getElementById('files').files, document.getElementById('zip').files[0], document.getElementById('deleteExisting').checked, document.getElementById('baseFolder').checked);
                     })
                     registration.active.postMessage('Service worker ready');
                     await registration.sync.register('sync');
@@ -88,7 +90,7 @@
                                 }
                                 xhr.send();
                             })
-                            await submitPressed([], res, urlParams.has('deleteExisting'));
+                            await submitPressed([], res, urlParams.has('deleteExisting'), urlParams.has('baseFolder'));
                             await put('opts?', {
                                 index: urlParams.has('index') || false,
                                 noDotHtml: urlParams.has('noDotHtml') || false,

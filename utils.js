@@ -78,7 +78,19 @@ function deleteF(key) {
 function toArrayBuffer(data) {
     return new TextEncoder('utf-8').encode(data).buffer;
 }
-
+async function updateTree(path, remove) {
+    var paths = await get('paths?');
+    if (remove !== true) {
+        if (paths.includes(path)) return;
+        paths.push(path);
+    } else {
+        var index = paths.indexOf(path);
+        if (index === -1) return;
+        paths.splice(index, 1);
+    }
+    await put('fileTree?', getFileTree(paths));
+    await put('paths?', paths);
+}
 function transformArgs(url) {
     var args = {};
     var idx = url.indexOf('?');
