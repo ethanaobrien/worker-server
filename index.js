@@ -160,7 +160,9 @@ async function submitPressed(files, zip, deleteExisting, baseFolder) {
             });
         }
         if (start) start='/'+start;
-        await processFiles(filez, start, baseFolder);
+        var a = !start;
+        if (baseFolder && !start) start = zip.name||'Zip';
+        await processFiles(filez, start, baseFolder, a);
     }
     await putOpts();
     document.getElementById('message').innerHTML = 'files set!';
@@ -168,7 +170,7 @@ async function submitPressed(files, zip, deleteExisting, baseFolder) {
     window.location.href = '/';
 }
 
-async function processFiles(files, basePath, baseFolder) {
+async function processFiles(files, basePath, baseFolder, isZip) {
     var paths = await get('paths?');
     if (!paths) paths = [];
     for (var i=0; i<files.length; i++) {
@@ -177,7 +179,9 @@ async function processFiles(files, basePath, baseFolder) {
         if (!baseFolder && basePath) {
             path = files[i].webkitRelativePath.substring(basePath.length, files[i].webkitRelativePath.length);
         } else {
-            path = files[i].webkitRelativePath;
+            path = '/'+files[i].webkitRelativePath;
+            if (isZip) path = basePath+'/'+files[i].webkitRelativePath;
+            path = ('/'+path).replaceAll('//', '/').replaceAll('//', '/');
         }
         paths.push(path);
         var default_types = ['text/html',
