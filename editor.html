@@ -49,6 +49,7 @@
                 }
                 window.deleteFile = async function(path) {
                     if (!confirm('Are you sure you want to delete '+path.split('/').pop())) return;
+                    closeFile(path);
                     await updateTree(path, true);
                     await deleteF(path);
                     await loadTree();
@@ -141,13 +142,13 @@
                     if (document.getElementById(path)) {
                         document.getElementById(path).remove();
                     }
-                    if (path === window.currentPath.path) {
+                    if (window.currentPath && path === window.currentPath.path) {
                         delete window.currentPath;
-                        if (document.getElementById('editor:'+path)) {
-                            document.getElementById('editor:'+path).remove();
-                        }
                     }
-                    delete window.currentPath[path];
+                    if (document.getElementById('editor:'+path)) {
+                        document.getElementById('editor:'+path).remove();
+                    }
+                    delete window.openFilesData[path];
                 }
                 document.getElementById('close').addEventListener('click', function(e) {
                     if (!window.currentPath) return;
@@ -200,9 +201,14 @@
                                 html += '</ul></li>';
                             } else {
                                 var mime = ['html', 'css', 'txt', 'js', 'md', 'htm', 'xhtm', 'xhtml', 'json'];
-                                if (mime.includes(a[i].name.split('.').pop().toLowerCase()) || !a[i].name.includes('.')) {
-                                    html += '<li><a style="text-decoration:none" href="javascript:void(0)" value="'+a[i].path+'" onclick="chooseFile(event);">'+a[i].name+'</a> - <a href="javascript:void(0)" onclick="rename(\''+a[i].path.replaceAll('"', '\\"')+'\')">rename</a> - <a href="javascript:void(0)" onclick="deleteFile(\''+a[i].path.replaceAll("'", "\\'")+'\')">delete</a></li>';
+                                var editable = !(mime.includes(a[i].name.split('.').pop().toLowerCase()) || !a[i].name.includes('.'));
+                                html += '<li>';
+                                if (editable) {
+                                    html += a[i].name;
+                                } else {
+                                    html += '<a style="text-decoration:none" href="javascript:void(0)" value="'+a[i].path+'" onclick="chooseFile(event);">'+a[i].name+'</a>';
                                 }
+                                html += ' - <a href="javascript:void(0)" onclick="rename(\''+a[i].path.replaceAll("'", "\\'")+'\')">rename</a> - <a href="javascript:void(0)" onclick="deleteFile(\''+a[i].path.replaceAll("'", "\\'")+'\')">delete</a></li>';
                             }
                         }
                     }
