@@ -47,69 +47,66 @@
             <a href="/">Go to site</a><br><br>
             <a href="/editor.html?bypass=1">Go to code editor</a>
         </div>
-        <p style="margin-left: 20px;"><a href="https://github.com/ethanaobrien/worker-server">Worker Server</a> Version 1.7</p>
+        <p style="margin-left: 20px;"><a href="https://github.com/ethanaobrien/worker-server">Worker Server</a> Version 2.0</p>
         <script>
             (async function() {
-                if ("serviceWorker" in navigator) {
-                    navigator.serviceWorker.register("worker.js?bypass=1");
-                    navigator.serviceWorker.addEventListener('message', function(e) {
-                        var data = e.data;
-                        document.getElementById('message').innerHTML = data;
-                    })
-                    var registration = await navigator.serviceWorker.ready;
-                    document.getElementById('submit').addEventListener('click', function(e) {
-                        registration.active.postMessage('Processing files');
-                        submitPressed(document.getElementById('files').files, document.getElementById('zip').files[0], document.getElementById('deleteExisting').checked, document.getElementById('baseFolder').checked);
-                    })
-                    registration.active.postMessage('Service worker ready');
-                    await registration.sync.register('sync');
-                    var urlParams = new URLSearchParams(window.location.search);
-                    var zip = urlParams.get('zip');
-                    if (zip) {
-                        registration.active.postMessage('Downloading zip');
-                        zip = decodeURIComponent(zip);
-                        try {
-                            var res = await new Promise(function(resolve, reject) {
-                                var xhr = new XMLHttpRequest();
-                                xhr.responseType = "arraybuffer";
-                                xhr.onload = function(e) {
-                                    var status = xhr.status;
-                                    if (status === 0 || (status >= 200 && status < 300)) {
-                                        resolve(xhr.response)
-                                    } else {
-                                        reject();
-                                    }
-                                }
-                                xhr.open("GET", zip+'?bypass=1');
-                                xhr.onprogress = function(e) {
-                                    if (e.total && e.total > 0) {
-                                        document.getElementById('message').innerHTML = 'Downloading zip '+((e.total/e.loaded)*100).toFixed(2)+'%';
-                                    } else {
-                                        document.getElementById('message').innerHTML = 'Downloading zip '+humanFileSize(e.loaded);
-                                    }
-                                }
-                                xhr.send();
-                            })
-                            await submitPressed([], res, urlParams.has('deleteExisting'), urlParams.has('baseFolder'));
-                            await put('opts?', {
-                                index: urlParams.has('index') || false,
-                                noDotHtml: urlParams.has('noDotHtml') || false,
-                                put: urlParams.has('put') || false,
-                                overWrite: urlParams.has('overWrite') || false,
-                                delete: urlParams.has('delete') || false,
-                                spa: urlParams.has('spa') || false,
-                                noDirectoryListing: urlParams.has('noDirectoryListing') || false,
-                                rewriteTo: (urlParams.has('rewriteTo')&&decodeURIComponent(urlParams.get('rewriteTo'))) || '/index.html',
-                                rewriteRegex: (urlParams.has('rewriteRegex')&&decodeURIComponent(urlParams.get('rewriteRegex'))) || '.*\\.[\d\\w]+$'
-                            })
-                        } catch(e) {
-                            console.warn(e);
-                            registration.active.postMessage('Error downloading zip (does the resource have cors headers?)');
-                        }
-                    }
-                } else {
+                const msg = document.getElementById('message');
+                if (!("serviceWorker" in navigator)) {
                     document.getElementById('main').innerHTML = '<p>Service workers not avaliable (are you on an https page?)</p>';
-                };
+                    return;
+                }
+                navigator.serviceWorker.register("worker.js?bypass=1");
+                navigator.serviceWorker.addEventListener('message', function(e) {
+                    var data = e.data;
+                    msg.innerHTML = data;
+                })
+                var registration = await navigator.serviceWorker.ready;
+                document.getElementById('submit').addEventListener('click', function(e) {
+                    registration.active.postMessage('Processing files');
+                    submitPressed(document.getElementById('files').files, document.getElementById('zip').files[0], document.getElementById('deleteExisting').checked, document.getElementById('baseFolder').checked);
+                })
+                registration.active.postMessage('Service worker ready');
+                await registration.sync.register('sync');
+                var urlParams = new URLSearchParams(window.location.search);
+                var zip = urlParams.get('zip');
+                if (zip) {
+                    registration.active.postMessage('Downloading zip');
+                    zip = decodeURIComponent(zip);
+                    try {
+                        var res = await new Promise(function(resolve, reject) {
+                            var xhr = new XMLHttpRequest();
+                            xhr.responseType = "arraybuffer";
+                            xhr.onload = function(e) {
+                                var status = xhr.status;
+                                if (status === 0 || (status >= 200 && status < 300)) {
+                                    resolve(xhr.response)
+                                } else {
+                                    reject();
+                                }
+                            }
+                            xhr.open("GET", zip+'?bypass=1');
+                            xhr.onprogress = function(e) {
+                                msg.innerHTML = 'Downloading zip '+humanFileSize(e.loaded);
+                            }
+                            xhr.send();
+                        })
+                        await submitPressed([], res, urlParams.has('deleteExisting'), urlParams.has('baseFolder'));
+                        await put('opts?', {
+                            index: urlParams.has('index') || false,
+                            noDotHtml: urlParams.has('noDotHtml') || false,
+                            put: urlParams.has('put') || false,
+                            overWrite: urlParams.has('overWrite') || false,
+                            delete: urlParams.has('delete') || false,
+                            spa: urlParams.has('spa') || false,
+                            noDirectoryListing: urlParams.has('noDirectoryListing') || false,
+                            rewriteTo: (urlParams.has('rewriteTo')&&decodeURIComponent(urlParams.get('rewriteTo'))) || '/index.html',
+                            rewriteRegex: (urlParams.has('rewriteRegex')&&decodeURIComponent(urlParams.get('rewriteRegex'))) || '.*\\.[\d\\w]+$'
+                        })
+                    } catch(e) {
+                        console.warn(e);
+                        registration.active.postMessage('Error downloading zip (does the resource have cors headers?)');
+                    }
+                }
             })();
         </script>
     </body>

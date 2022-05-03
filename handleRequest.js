@@ -15,6 +15,10 @@ async function normalRequest(request) {
     try {
         var res = await fetch(request);
         if (!res.ok) throw new Error('not ok');
+        if ((new URL(res.url)).hostname !== (new URL(request.url)).hostname) {
+            res = null;
+            throw new Error('not secure');
+        }
         return res;
     } catch(e) {
         var cache = await caches.open('files');

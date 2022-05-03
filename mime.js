@@ -274,6 +274,7 @@ MIMETYPES = {
     "ghf": "application/vnd.groove-help", 
     "gif": "image/gif", 
     "gim": "application/vnd.groove-identity-message", 
+    "gitignore": "text/plain", 
     "gml": "application/gml+xml", 
     "gmx": "application/vnd.gmx", 
     "gnumeric": "application/x-gnumeric", 
@@ -987,12 +988,12 @@ MIMETYPES = {
     "zirz": "application/vnd.zul", 
     "zmm": "application/vnd.handheld-entertainment+xml"
 };
-MIMECATEGORIES = {'video':[],'audio':[]}
-for (var key in MIMETYPES) {
-    var category = MIMETYPES[key].split('/')[0]
+MIMECATEGORIES = {}
+for (var k in MIMETYPES) {
+    var category = MIMETYPES[k].split('/')[0]
     if (! MIMECATEGORIES[category]) {
-        MIMECATEGORIES[category] = [ ]
+        MIMECATEGORIES[category] = [];
     }
-    MIMECATEGORIES[category].push(key)
+    MIMECATEGORIES[category].push(k)
 }
 

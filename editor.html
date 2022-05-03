@@ -153,6 +153,17 @@
                 document.getElementById('close').addEventListener('click', function(e) {
                     if (!window.currentPath) return;
                     closeFile(window.currentPath.path);
+                    if (document.getElementById('openFiles').getElementsByTagName('a')[0]) {
+                        document.getElementById('openFiles').getElementsByTagName('a')[0].click();
+                    } else {
+                        document.getElementById('save').style.display = 'none';
+                        document.getElementById('fileEditor').style.display = 'none';
+                        document.getElementById('openFiles').style.display = 'none';
+                        document.getElementById('close').style.display = 'none';
+                        document.getElementById('fileTree').style.display = '';
+                        document.getElementById('cancel').style.display = 'none';
+                        document.getElementById('openFile').style.display = 'none';
+                    }
                 })
                 async function save(e) {
                     if (!window.currentPath) return;
@@ -201,9 +212,10 @@
                                 html += '</ul></li>';
                             } else {
                                 var mime = ['html', 'css', 'txt', 'js', 'md', 'htm', 'xhtm', 'xhtml', 'json'];
-                                var editable = !(mime.includes(a[i].name.split('.').pop().toLowerCase()) || !a[i].name.includes('.'));
+                                var n = a[i].name.split('.').pop().toLowerCase();
+                                var editable = (MIMECATEGORIES.text.includes(n) || mime.includes(n) || !a[i].name.includes('.'));
                                 html += '<li>';
-                                if (editable) {
+                                if (!editable) {
                                     html += a[i].name;
                                 } else {
                                     html += '<a style="text-decoration:none" href="javascript:void(0)" value="'+a[i].path+'" onclick="chooseFile(event);">'+a[i].name+'</a>';
