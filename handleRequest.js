@@ -48,7 +48,7 @@ async function handleRequest(e) {
     var url = new URL(e.request.url);
     var path = decodeURIComponent(url.pathname);
     var args = transformArgs(decodeURIComponent(e.request.url));
-    if (['1', 'true'].includes(args.bypass)) {
+    if (['1', 'true'].includes(args.bypass) || self.location.hostname !== url.hostname) {
         return await normalRequest(e.request);
     }
     var opts = await get('opts?');
