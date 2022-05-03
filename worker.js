@@ -7,6 +7,7 @@ addEventListener('message', function(e) {
 });
 
 addEventListener("fetch", (e) => {
+    if (self.location.hostname !== (new URL(e.request.url)).hostname) return;
     e.respondWith(handleRequest(e));
 });
 

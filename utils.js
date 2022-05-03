@@ -80,6 +80,7 @@ function toArrayBuffer(data) {
 }
 async function updateTree(path, remove) {
     var paths = await get('paths?');
+    if (!paths) paths = [];
     if (remove !== true) {
         if (paths.includes(path)) return;
         paths.push(path);

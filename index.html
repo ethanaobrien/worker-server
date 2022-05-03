@@ -11,6 +11,9 @@
         <div style="padding: 20px;" id="main">
             Choose Directory: <input type="file" webkitdirectory multiple id="files"><br><br>
             Choose Zip: <input type="file" id="zip"><br><br>
+            <!--
+            <button id="github">Import From Github</button><br><br>
+            -->
             <input type="checkbox" id="index" name="index">
             <label for="index"> Auto render index.html</label><br>
             <input type="checkbox" id="noDotHtml" name="noDotHtml">
@@ -63,7 +66,7 @@
                 var registration = await navigator.serviceWorker.ready;
                 document.getElementById('submit').addEventListener('click', function(e) {
                     registration.active.postMessage('Processing files');
-                    submitPressed(document.getElementById('files').files, document.getElementById('zip').files[0], document.getElementById('deleteExisting').checked, document.getElementById('baseFolder').checked);
+                    submitPressed(document.getElementById('files').files, document.getElementById('zip').files[0], isChecked('deleteExisting'), isChecked('baseFolder'));
                 })
                 registration.active.postMessage('Service worker ready');
                 await registration.sync.register('sync');
@@ -73,34 +76,18 @@
                     registration.active.postMessage('Downloading zip');
                     zip = decodeURIComponent(zip);
                     try {
-                        var res = await new Promise(function(resolve, reject) {
-                            var xhr = new XMLHttpRequest();
-                            xhr.responseType = "arraybuffer";
-                            xhr.onload = function(e) {
-                                var status = xhr.status;
-                                if (status === 0 || (status >= 200 && status < 300)) {
-                                    resolve(xhr.response)
-                                } else {
-                                    reject();
-                                }
-                            }
-                            xhr.open("GET", zip+'?bypass=1');
-                            xhr.onprogress = function(e) {
-                                msg.innerHTML = 'Downloading zip '+humanFileSize(e.loaded);
-                            }
-                            xhr.send();
-                        })
+                        var res = await fetchZip(zip+'?bypass=1');
                         await submitPressed([], res, urlParams.has('deleteExisting'), urlParams.has('baseFolder'));
                         await put('opts?', {
-                            index: urlParams.has('index') || false,
-                            noDotHtml: urlParams.has('noDotHtml') || false,
-                            put: urlParams.has('put') || false,
-                            overWrite: urlParams.has('overWrite') || false,
-                            delete: urlParams.has('delete') || false,
-                            spa: urlParams.has('spa') || false,
-                            noDirectoryListing: urlParams.has('noDirectoryListing') || false,
-                            rewriteTo: (urlParams.has('rewriteTo')&&decodeURIComponent(urlParams.get('rewriteTo'))) || '/index.html',
-                            rewriteRegex: (urlParams.has('rewriteRegex')&&decodeURIComponent(urlParams.get('rewriteRegex'))) || '.*\\.[\d\\w]+$'
+                            index: urlParams.has('index') || isChecked('index') || false,
+                            noDotHtml: urlParams.has('noDotHtml') || isChecked('noDotHtml') || false,
+                            put: urlParams.has('put') || isChecked('put') || false,
+                            overWrite: urlParams.has('overWrite') || isChecked('overWrite') || false,
+                            delete: urlParams.has('delete') || isChecked('delete') || false,
+                            spa: urlParams.has('spa') || isChecked('spa') || false,
+                            noDirectoryListing: urlParams.has('noDirectoryListing') || isChecked('noDirectoryListing') || false,
+                            rewriteTo: (urlParams.has('rewriteTo')&&decodeURIComponent(urlParams.get('rewriteTo'))) || document.getElementById('rewriteTo').value || '/index.html',
+                            rewriteRegex: (urlParams.has('rewriteRegex')&&decodeURIComponent(urlParams.get('rewriteRegex'))) || document.getElementById('rewriteRegex').value || '.*\\.[\d\\w]+$'
                         })
                     } catch(e) {
                         console.warn(e);

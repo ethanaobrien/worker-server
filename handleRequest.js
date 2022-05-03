@@ -13,7 +13,7 @@ function notFound(method) {
 
 async function normalRequest(request) {
     try {
-        var res = await fetch(request);
+        var res = await fetch(request, {redirect: 'follow'});
         if (!res.ok) throw new Error('not ok');
         if ((new URL(res.url)).hostname !== (new URL(request.url)).hostname) {
             res = null;
@@ -48,7 +48,7 @@ async function handleRequest(e) {
     var url = new URL(e.request.url);
     var path = decodeURIComponent(url.pathname);
     var args = transformArgs(decodeURIComponent(e.request.url));
-    if (['1', 'true'].includes(args.bypass) || self.location.hostname !== url.hostname) {
+    if (['1', 'true'].includes(args.bypass)) {
         return await normalRequest(e.request);
     }
     var opts = await get('opts?');

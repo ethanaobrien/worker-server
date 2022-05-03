@@ -99,15 +99,21 @@ function getFileTree(paths) {
     return process(result);
 }
 
+function isChecked(id) {
+    var a = document.getElementById(id);
+    if (!a) return false;
+    return a.checked;
+}
+
 async function putOpts() {
     await put('opts?', {
-        index: document.getElementById('index').checked || false,
-        noDotHtml: document.getElementById('noDotHtml').checked || false,
-        put: document.getElementById('put').checked || false,
-        overWrite: document.getElementById('overWrite').checked || false,
-        delete: document.getElementById('delete').checked || false,
-        spa: document.getElementById('spa').checked || false,
-        noDirectoryListing: document.getElementById('noDirectoryListing').checked || false,
+        index: isChecked('index') || false,
+        noDotHtml: isChecked('noDotHtml') || false,
+        put: isChecked('put') || false,
+        overWrite: isChecked('overWrite') || false,
+        delete: isChecked('delete') || false,
+        spa: isChecked('spa') || false,
+        noDirectoryListing: isChecked('noDirectoryListing') || false,
         rewriteTo: document.getElementById('rewriteTo').value || '/index.html',
         rewriteRegex: document.getElementById('rewriteRegex').value || '.*\\.[\d\\w]+$'
     })
@@ -246,7 +252,52 @@ function visibilityDependency(id1, id2) {
     })
 }
 
+function fetchZip(zip) {
+    const msg = document.getElementById('message');
+    return new Promise(function(resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.responseType = "arraybuffer";
+        xhr.onload = async function(e) {
+            var status = xhr.status;
+            var location = xhr.getResponseHeader("location");
+            if (status === 0 || (status >= 200 && status < 300)) {
+                resolve(xhr.response)
+            } else if ([301, 302, 307].includes(status) && location) {
+                resolve(await fetchZip(location));
+            } else {
+                reject({status, body:xhr.response});
+            }
+        }
+        xhr.open("GET", zip);
+        xhr.onerror = function(e) {
+            reject();
+        }
+        xhr.onprogress = function(e) {
+            msg.innerHTML = 'Downloading zip '+humanFileSize(e.loaded);
+        }
+        xhr.send();
+    })
+}
+
+async function githubImport() {
+    //find way around cors
+    const msg = document.getElementById('message');
+    var url = prompt('enter github repo url');
+    if (!url) return;
+    var parts = url.split('://').pop().split('/');
+    var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/zipball/main';
+    try {
+        var res = await fetchZip(downloadLink);
+        await submitPressed([], res, isChecked('deleteExisting'), isChecked('baseFolder'));
+    } catch(e) {
+        return;
+    }
+}
+
 window.addEventListener('DOMContentLoaded', async function() {
+    if (document.getElementById('github')) {
+        document.getElementById('github').addEventListener('click', githubImport);
+    }
     var opts = await get('opts?');
     if (!opts) opts = {};
     for (var k in opts) {
@@ -297,6 +348,10 @@ window.addEventListener('DOMContentLoaded', async function() {
             }, 5000)
             window.processing = false;
         })
+    }
+    if (!(await get('htmlTemplate?'))) {
+        var htmlTemplate = await (await fetch('directory-listing-template.html?bypass=1', {redirect: "follow"})).text();
+        await put('htmlTemplate?', htmlTemplate);
     }
 })
 

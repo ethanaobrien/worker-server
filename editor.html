@@ -189,7 +189,10 @@
                 })
                 async function loadTree() {
                     var tree = await get('fileTree?');
-                    if (!tree) return;
+                    if (!tree) {
+                        document.getElementById('fileTree').innerHTML = 'No files yet. Press create to get started.';
+                        return;
+                    };
                     var html = '<style>ul,#myUL{list-style-type:none}#myUL{margin:0;padding:0}.caret{cursor:pointer;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.caret::before{content:"\\25B6";color:#000;display:inline-block;margin-right:6px}.caret-down::before{-ms-transform:rotate(90deg);-webkit-transform:rotate(90deg);transform:rotate(90deg)}.nested{display:none}.active{display:block}</style><ul id="myUL">';
                     function processFiles(a) {
                         a = a.sort(function(a, b) {
