@@ -69,7 +69,6 @@
                     submitPressed(document.getElementById('files').files, document.getElementById('zip').files[0], isChecked('deleteExisting'), isChecked('baseFolder'));
                 })
                 registration.active.postMessage('Service worker ready');
-                await registration.sync.register('sync');
                 var urlParams = new URLSearchParams(window.location.search);
                 var zip = urlParams.get('zip');
                 if (zip) {

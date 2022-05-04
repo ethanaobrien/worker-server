@@ -18,6 +18,7 @@ addEventListener('install', function(e) {
             return cache.addAll([
                 '/index.html?bypass=1',
                 '/directory-listing-template.html?bypass=1',
+                '/utils.js?bypass=1',
                 '/handleRequest.js?bypass=1',
                 '/index.js?bypass=1',
                 '/mime.js?bypass=1',
@@ -25,7 +26,8 @@ addEventListener('install', function(e) {
                 '/jszip.js?bypass=1',
                 '/codemirror.css?bypass=1',
                 '/codemirror.min.js?bypass=1',
-                '/editor.html?bypass=1'
+                '/editor.html?bypass=1',
+                '/favicon.ico?bypass=1'
             ]);
         })()
     );
