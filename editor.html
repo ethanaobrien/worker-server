@@ -5,6 +5,7 @@
         <script src="codemirror.min.js?bypass=1"></script>
         <script src="mime.js?bypass=1"></script>
         <link rel="stylesheet" href="codemirror.css?bypass=1">
+        <link rel="icon" type="image/x-icon" href="/favicon.ico?bypass=1">
     </head>
     <body>
         <button id="openFile" style="display:none;">Open</button>
@@ -193,8 +194,21 @@
                     if (!tree) {
                         document.getElementById('fileTree').innerHTML = 'No files yet. Press create to get started.';
                         return;
-                    };
-                    var html = '<style>ul,#myUL{list-style-type:none}#myUL{margin:0;padding:0}.caret{cursor:pointer;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.caret::before{content:"\\25B6";color:#000;display:inline-block;margin-right:6px}.caret-down::before{-ms-transform:rotate(90deg);-webkit-transform:rotate(90deg);transform:rotate(90deg)}.nested{display:none}.active{display:block}</style><ul id="myUL">';
+                    }
+                    var openPaths = [];
+                    if (window.filesProcessed) {
+                        var a = document.getElementsByClassName("caret");
+                        for (var i=0; i<a.length; i++) {
+                            if (a[i].attributes &&
+                                a[i].attributes.value &&
+                                a[i].attributes.value.textContent &&
+                                a[i].classList.contains('caret-down')) {
+                                openPaths.push(a[i].attributes.value.textContent);
+                            }
+                        }
+                    }
+                    window.filesProcessed = true;
+                    var html = '<style>ul,#myUL{list-style-type:none}.drag{background-color:#C0C0C0}#myUL{margin:0;padding:0}.caret{cursor:pointer;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.caret::before{content:"\\25B6";color:#000;display:inline-block;margin-right:6px}.caret-down::before{-ms-transform:rotate(90deg);-webkit-transform:rotate(90deg);transform:rotate(90deg)}.nested{display:none}.active{display:block}</style><ul id="myUL">';
                     function processFiles(a) {
                         a = a.sort(function(a, b) {
                             var anl = a.name.toLowerCase()
@@ -211,7 +225,12 @@
                         });
                         for (var i=0; i<a.length; i++) {
                             if (a[i].isDirectory) {
-                                html += '<li><span class="caret">'+a[i].name+'</span><ul class="nested">';
+                                var q='',b='';
+                                if (openPaths.includes(a[i].path)) {
+                                    q=' caret-down';
+                                    b=' active';
+                                }
+                                html += '<li><span class="caret'+q+'" value="'+a[i].path+'">'+a[i].name+'</span><ul class="nested'+b+'">';
                                 processFiles(a[i].children);
                                 html += '</ul></li>';
                             } else {
@@ -219,19 +238,82 @@
                                 var n = a[i].name.split('.').pop().toLowerCase();
                                 var editable = (MIMECATEGORIES.text.includes(n) || mime.includes(n) || !a[i].name.includes('.'));
                                 html += '<li>';
-                                if (!editable) {
-                                    html += a[i].name;
-                                } else {
-                                    html += '<a style="text-decoration:none" href="javascript:void(0)" value="'+a[i].path+'" onclick="chooseFile(event);">'+a[i].name+'</a>';
-                                }
-                                html += ' - <a href="javascript:void(0)" onclick="rename(\''+a[i].path.replaceAll("'", "\\'")+'\')">rename</a> - <a href="javascript:void(0)" onclick="deleteFile(\''+a[i].path.replaceAll("'", "\\'")+'\')">delete</a></li>';
+                                html += '<a style="text-decoration:none" href="javascript:void(0)" value="'+a[i].path+'" '+(editable?'onclick="chooseFile(event);"':'')+'>'+a[i].name+'</a> - <a href="javascript:void(0)" onclick="rename(\''+a[i].path.replaceAll("'", "\\'")+'\')">rename</a> - <a href="javascript:void(0)" onclick="deleteFile(\''+a[i].path.replaceAll("'", "\\'")+'\')">delete</a></li>';
                             }
                         }
                     }
                     processFiles(tree);
                     html += '</ul>';
                     document.getElementById('fileTree').innerHTML = html;
-                    for(var toggler=document.getElementsByClassName("caret"),i=0;i<toggler.length;i++)toggler[i].addEventListener("click",function(){this.parentElement.querySelector(".nested").classList.toggle("active"),this.classList.toggle("caret-down")});
+                    for(var toggler=document.getElementsByClassName("caret"),i=0;i<toggler.length;i++) {
+                        toggler[i].addEventListener("click",function(){
+                            this.parentElement.querySelector(".nested").classList.toggle("active");
+                            this.classList.toggle("caret-down");
+                        });
+                        toggler[i].addEventListener("dragover",function(e){
+                            e.preventDefault();
+                        });
+                        toggler[i].addEventListener("dragenter",function(e){
+                            this.classList.add("drag");
+                        });
+                        toggler[i].addEventListener("dragleave",function(e){
+                            this.classList.remove("drag");
+                        });
+                        toggler[i].addEventListener("drop",function(currentFolder){
+                            return async function(e) {
+                                e.preventDefault();
+                                this.classList.remove("drag");
+                                var items = e.dataTransfer.items;
+                                if (items) {
+                                    for (var i=0; i<items.length; i++) {
+                                        var item = items[i];
+                                        if (item.kind === 'string' && item.type.match('^text/html')) {
+                                            item.getAsString(async function(data) {
+                                                var parser = new DOMParser();
+                                                var doc = parser.parseFromString(data, "text/html");
+                                                if (doc.body &&
+                                                    doc.body.firstChild &&
+                                                    doc.body.firstChild.attributes &&
+                                                    doc.body.firstChild.attributes.value &&
+                                                    doc.body.firstChild.attributes.value.textContent) {
+                                                    var path = doc.body.firstChild.attributes.value.textContent;
+                                                    var newPath = currentFolder+path.split('/').pop();
+                                                    if (path === newPath) return;
+                                                    await updateTree(path, true);
+                                                    var data = await get(path);
+                                                    if (!data) return;
+                                                    await put(newPath, data);
+                                                    await deleteF(path);
+                                                    await updateTree(newPath);
+                                                    await loadTree();
+                                                }
+                                            });
+                                        } else if (item.kind === 'file') {
+                                            var file = item.getAsFile();
+                                            var path = currentFolder+file.name;
+                                            var default_types = ['text/html',
+                                                                 'text/xml',
+                                                                 'text/plain',
+                                                                 "text/vnd.wap.wml",
+                                                                 "application/javascript",
+                                                                 "application/rss+xml"]
+                                            var type = MIMETYPES[path.split('.').pop()];
+                                            if (type && default_types.includes(type)) {
+                                                type += '; charset=utf-8';
+                                            }
+                                            var data = {
+                                                data: await file.arrayBuffer(),
+                                                type: type || ''
+                                            }
+                                            await updateTree(path);
+                                            await put(path, data);
+                                            await loadTree();
+                                        }
+                                    }
+                                }
+                            };
+                        }(toggler[i].attributes.value.textContent));
+                    }
                 }
                 await loadTree();
                 window.addEventListener('beforeunload', function(e) {
