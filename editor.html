@@ -20,8 +20,9 @@
         <script>
             (async function() {
                 function encode(path, opt) {
-                    if (opt === true) return path.replaceAll('"', '\\"').replaceAll("'", "\\'");
-                    else if (["'",'"'].includes(opt)) return path.replaceAll(opt, '\\'+opt);
+                    if (opt === true) return encode(encode(path, '"'), "'");
+                    else if (opt === '"') return path.replaceAll('"', '&quot;');
+                    else if (opt === "'") return path.replaceAll("'", "\\'");
                     else if (opt === 'html') return path.replaceAll(/&/g, "&amp;").replaceAll(/</g, "&lt;").replaceAll(/>/g, "&gt;").replaceAll(/"/g, "&quot;").replaceAll(/'/g, "&#039;");;
                 }
                 window.openFilesData = {};
@@ -45,7 +46,7 @@
                 })
                 window.rename = async function(path) {
                     var newName = decodeURIComponent(window.prompt('Enter new file name', path.split('/').pop()));
-                    if (!newName) return;
+                    if (!newName||newName=='null') return;
                     var newPath = path.substring(0, path.length-path.split('/').pop().length)+newName;
                     await updateTree(path, true);
                     var data = await get(path);
@@ -62,7 +63,7 @@
                     await loadTree();
                 }
                 window.chooseFile = async function(e, path) {
-                    if (!e&&!path) return;
+                    if ((e&&!(path||path!='null'))) return;
                     var ed = document.getElementById('fileEditor');
                     for (var i=0; i<ed.children.length; i++) {
                         ed.children[i].style.display = 'none';
@@ -235,7 +236,7 @@
                                     q=' caret-down';
                                     b=' active';
                                 }
-                                html += '<li><span class="caret'+q+'" value="'+encode(a[i].path)+'">'+encode(a[i].name, 'html')+'</span><ul class="nested'+b+'">';
+                                html += '<li><span class="caret'+q+'" value="'+encode(a[i].path, '"')+'">'+encode(a[i].name, 'html')+'</span><ul class="nested'+b+'">';
                                 processFiles(a[i].children);
                                 html += '</ul></li>';
                             } else {
