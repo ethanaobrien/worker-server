@@ -19,6 +19,11 @@
         <div id="fileTree" style="padding:20px;">loading...</div>
         <script>
             (async function() {
+                function encode(path, opt) {
+                    if (opt === true) return path.replaceAll('"', '\\"').replaceAll("'", "\\'");
+                    else if (["'",'"'].includes(opt)) return path.replaceAll(opt, '\\'+opt);
+                    else if (opt === 'html') return path.replaceAll(/&/g, "&amp;").replaceAll(/</g, "&lt;").replaceAll(/>/g, "&gt;").replaceAll(/"/g, "&quot;").replaceAll(/'/g, "&#039;");;
+                }
                 window.openFilesData = {};
                 document.getElementById('openFile').addEventListener('click', function(e) {
                     document.getElementById('save').style.display = 'none';
@@ -39,7 +44,7 @@
                     document.getElementById('cancel').style.display = 'none';
                 })
                 window.rename = async function(path) {
-                    var newName = window.prompt('Enter new file name', path.split('/').pop());
+                    var newName = decodeURIComponent(window.prompt('Enter new file name', path.split('/').pop()));
                     if (!newName) return;
                     var newPath = path.substring(0, path.length-path.split('/').pop().length)+newName;
                     await updateTree(path, true);
@@ -112,7 +117,7 @@
                     if (name.length > 20) {
                         name = name.substring(0, 17)+'...';
                     }
-                    document.getElementById('openFiles').innerHTML += '<p id="'+value+'"><a style="text-decoration:none" href="javascript:void(0)" value="'+value+'" onclick="chooseFile(event);">'+name+'</a></p>';
+                    document.getElementById('openFiles').innerHTML += '<p id="'+encode(value, '"')+'"><a style="text-decoration:none" href="javascript:void(0)" value="'+value+'" onclick="chooseFile(event);">'+encode(name, 'html')+'</a></p>';
                     var div = document.createElement('div');
                     div.id = 'editor:'+value;
                     ed.appendChild(div);
@@ -138,7 +143,7 @@
                     window.openFilesData[value] = window.currentPath;
                 }
                 document.getElementById('new').addEventListener('click', function(e) {
-                    chooseFile(null, prompt('enter file path'))
+                    chooseFile(null, decodeURIComponent(prompt('enter file path')))
                 })
                 function closeFile(path) {
                     if (document.getElementById(path)) {
@@ -226,11 +231,11 @@
                         for (var i=0; i<a.length; i++) {
                             if (a[i].isDirectory) {
                                 var q='',b='';
-                                if (openPaths.includes(a[i].path)) {
+                                if (openPaths.includes(a[i].path) || a[i].path === '/') {
                                     q=' caret-down';
                                     b=' active';
                                 }
-                                html += '<li><span class="caret'+q+'" value="'+a[i].path+'">'+a[i].name+'</span><ul class="nested'+b+'">';
+                                html += '<li><span class="caret'+q+'" value="'+encode(a[i].path)+'">'+encode(a[i].name, 'html')+'</span><ul class="nested'+b+'">';
                                 processFiles(a[i].children);
                                 html += '</ul></li>';
                             } else {
@@ -238,7 +243,7 @@
                                 var n = a[i].name.split('.').pop().toLowerCase();
                                 var editable = (MIMECATEGORIES.text.includes(n) || mime.includes(n) || !a[i].name.includes('.'));
                                 html += '<li>';
-                                html += '<a style="text-decoration:none" href="javascript:void(0)" value="'+a[i].path+'" '+(editable?'onclick="chooseFile(event);"':'')+'>'+a[i].name+'</a> - <a href="javascript:void(0)" onclick="rename(\''+a[i].path.replaceAll("'", "\\'")+'\')">rename</a> - <a href="javascript:void(0)" onclick="deleteFile(\''+a[i].path.replaceAll("'", "\\'")+'\')">delete</a></li>';
+                                html += '<a style="text-decoration:none" href="javascript:void(0)" value="'+encode(a[i].path, '"')+'" '+(editable?'onclick="chooseFile(event);"':'')+'>'+encode(a[i].name, 'html')+'</a> - <a href="javascript:void(0)" onclick="rename(\''+encode(a[i].path, true)+'\')">rename</a> - <a href="javascript:void(0)" onclick="deleteFile(\''+encode(a[i].path, "'")+'\')">delete</a></li>';
                             }
                         }
                     }
