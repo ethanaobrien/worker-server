@@ -75,6 +75,13 @@ function deleteF(key) {
         };
     });
 };
+function resetDB(storeName) {
+    return new Promise(function(resolve, reject) {
+        var request = indexedDB.deleteDatabase(storeName);
+        request.onerror = resolve;
+        request.onsuccess = resolve;
+    })
+}
 function toArrayBuffer(data) {
     return new TextEncoder('utf-8').encode(data).buffer;
 }
