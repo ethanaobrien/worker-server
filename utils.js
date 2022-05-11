@@ -1,5 +1,5 @@
 String.prototype.htmlEscape = function() {
-    return this.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    return this.replaceAll(/&/g, "&amp;").replaceAll(/</g, "&lt;").replaceAll(/>/g, "&gt;").replaceAll(/"/g, "&quot;").replaceAll(/'/g, "&#039;");
 }
 const storeName = 'userSiteFiles';
 function put(key, data) {
@@ -78,7 +78,7 @@ function deleteF(key) {
 function toArrayBuffer(data) {
     return new TextEncoder('utf-8').encode(data).buffer;
 }
-async function updateTree(path, remove) {
+async function updateTree(path, remove, folder) {
     var paths = await get('paths?');
     if (!paths) paths = [];
     if (remove !== true) {
@@ -86,8 +86,15 @@ async function updateTree(path, remove) {
         paths.push(path);
     } else {
         var index = paths.indexOf(path);
-        if (index === -1) return;
-        paths.splice(index, 1);
+        if (index !== -1) {
+        	paths.splice(index, 1);
+        }
+        for (var i=0; i<paths.length; i++) {
+            if (paths[i].startsWith(path) && !paths[i].split(path).pop().includes('/')) {
+                paths.splice(i, 1);
+                i--;
+            }
+        }
     }
     await put('fileTree?', getFileTree(paths));
     await put('paths?', paths);
@@ -112,21 +119,25 @@ function transformArgs(url) {
 function getFileTree(paths) {
     function process(a) {
         for (var i=0; i<a.length; i++) {
-            if (a[i].children.length > 0) {
+            if (a[i].children.length > 0 || a[i].path.endsWith('/')) {
                 a[i].isFile = false;
                 a[i].isDirectory = true;
-                a[i].children = process(a[i].children);
                 var q = a[i].path.length-a[i].path.split('/'+a[i].name+'/');
                 var v = a[i].path.split('/');
                 var q = v.lastIndexOf(a[i].name);
                 a[i].path = a[i].path.substring(0, a[i].path.length-v.slice(q+1).join('/').length);
-                if (a[i].name === '') {
+                if (a[i].name === '' && a[i].path === '/') {
                     a[i].path = '/';
                     a[i].name = '/';
+                } else if (a[i].name === '') {
+                    a.splice(a[i], 1);
+                    i--;
+                    continue;
                 }
                 if (!a[i].path.endsWith('/')) {
                     a[i].path += '/';
                 }
+                a[i].children = process(a[i].children);
             } else {
                 a[i].isFile = true;
                 a[i].isDirectory = false;

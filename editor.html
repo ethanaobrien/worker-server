@@ -6,24 +6,68 @@
         <script src="mime.js?bypass=1"></script>
         <link rel="stylesheet" href="codemirror.css?bypass=1">
         <link rel="icon" type="image/x-icon" href="/favicon.ico?bypass=1">
+        <style>
+            body {
+                background-color: #EBFF52;
+                margin: 0px;
+            }
+            .koolButton {
+                background-color: #ff8400;
+                border: 2px solid #ff8400;
+                margin: 0px;
+                color: #ffffff;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                transition-duration: 0.4s;
+            }
+            .koolButton:hover {
+                background-color: #ffffff;
+                color: black;
+                box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.19);
+                cursor:pointer;
+            }
+            .bg {
+                height: 100%;
+                width: 10%;
+                padding: 0px;
+            }
+            .bgItem {
+                padding-left: 5px;
+                overflow: scroll;
+            }
+            .bg2 {
+                height: 25px;
+                overflow: scroll;
+            }
+            .tree {
+                padding: 20px;
+            }
+        </style>
     </head>
     <body>
-        <button id="openFile" style="display:none;">Open</button>
-        <button id="new">New</button>
-        <button id="save" style="display:none;">Save</button>
-        <button id="close" style="display:none;">Close</button>
-        <button id="cancel" style="display:none;">Cancel</button>
-        <a href="/">Go to site</a>
-        <div id="openFiles" style="display:none;float:left;width:10%;padding:5px;"></div>
-        <div id="fileEditor" style="display:none;padding:20px;"></div>
-        <div id="fileTree" style="padding:20px;">loading...</div>
+        <div id="openFiles" class="bg" style="display:none;float:left;"></div>
+        <div class="bg2">
+            <button class="koolButton" id="openFile" style="display:none;">Open</button>
+            <button class="koolButton" id="newFile">New File</button>
+            <button class="koolButton" id="newFolder">New Folder</button>
+            <button class="koolButton" id="save" style="display:none;">Save</button>
+            <button class="koolButton" id="close" style="display:none;">Close</button>
+            <button class="koolButton" id="cancel" style="display:none;">Cancel</button>
+            <a href="/">Go to site</a>
+        </div>
+        <div id="fileEditor" style="display:none;padding-left:10%;"></div>
+        <div id="fileTree" class="tree">loading...</div>
+        <script>window.onerror = function(e) {alert(e)}</script>
         <script>
             (async function() {
-                function encode(path, opt) {
-                    if (opt === true) return encode(encode(path, '"'), "'");
-                    else if (opt === '"') return path.replaceAll('"', '&quot;');
-                    else if (opt === "'") return path.replaceAll("'", "\\'");
-                    else if (opt === 'html') return path.replaceAll(/&/g, "&amp;").replaceAll(/</g, "&lt;").replaceAll(/>/g, "&gt;").replaceAll(/"/g, "&quot;").replaceAll(/'/g, "&#039;");;
+                function encode(path, html) {
+                    if (html !== true) {
+                        return path.replaceAll(/&/g, "&amp;").replaceAll(/</g, "&lt;").replaceAll(/>/g, "&gt;").replaceAll(/"/g, "&quot;").replaceAll("'", "\\'");
+                    } else {
+                        return path.replaceAll(/&/g, "&amp;").replaceAll(/</g, "&lt;").replaceAll(/>/g, "&gt;").replaceAll(/"/g, "&quot;").replaceAll(/'/g, "&#039;");
+                    }
                 }
                 window.openFilesData = {};
                 document.getElementById('openFile').addEventListener('click', function(e) {
@@ -62,8 +106,19 @@
                     await deleteF(path);
                     await loadTree();
                 }
+                window.deleteFolder = async function(path) {
+                    var name = path.split('/')[path.split('/').length-2];
+                    if (!confirm('Are you sure you want to delete '+name+'? All files in this folder will be removed!')) return;
+                    for (var k in window.openFilesData) {
+                        if (k.startsWith(path) && !k.split(path).pop().includes('/')) {
+                            closeFile(k);
+                        }
+                    }
+                    await updateTree(path, true, true);
+                    await loadTree();
+                }
                 window.chooseFile = async function(e, path) {
-                    if ((e&&!(path||path!='null'))) return;
+                    if (!e&&!path) return;
                     var ed = document.getElementById('fileEditor');
                     for (var i=0; i<ed.children.length; i++) {
                         ed.children[i].style.display = 'none';
@@ -118,7 +173,7 @@
                     if (name.length > 20) {
                         name = name.substring(0, 17)+'...';
                     }
-                    document.getElementById('openFiles').innerHTML += '<p id="'+encode(value, '"')+'"><a style="text-decoration:none" href="javascript:void(0)" value="'+value+'" onclick="chooseFile(event);">'+encode(name, 'html')+'</a></p>';
+                    document.getElementById('openFiles').innerHTML += '<p class="bgItem" id="'+encode(value)+'"><a style="text-decoration:none" href="javascript:void(0)" value="'+value+'" onclick="chooseFile(event);">'+encode(name, true)+'</a></p>';
                     var div = document.createElement('div');
                     div.id = 'editor:'+value;
                     ed.appendChild(div);
@@ -134,7 +189,7 @@
                         lineWrapping: true,
                         mode:  file.type.split(';')[0]
                     });
-                    editor.setSize("90%", "90%");
+                    editor.setSize("100%", window.innerHeight-25);
                     window.currentPath = {
                         path:value,
                         type:file.type,
@@ -143,8 +198,24 @@
                     };
                     window.openFilesData[value] = window.currentPath;
                 }
-                document.getElementById('new').addEventListener('click', function(e) {
-                    chooseFile(null, decodeURIComponent(prompt('enter file path')))
+                window.addEventListener('resize', function(e) {
+                    if (window.currentPath && window.currentPath.editor) {
+                        window.currentPath.editor.setSize("100%", window.innerHeight-25);
+                    }
+                    for (var k in window.openFilesData) {
+                        window.openFilesData[k].editor.setSize("100%", window.innerHeight-25);
+                    }
+                })
+                document.getElementById('newFile').addEventListener('click', function(e) {
+                    var name = prompt('enter file name');
+                    if (!name) return;
+                    chooseFile(null, decodeURIComponent(name).replaceAll('/', ''));
+                })
+                document.getElementById('newFolder').addEventListener('click', async function(e) {
+                    var name = prompt('enter folder name');
+                    if (!name) return;
+                    await updateTree('/'+decodeURIComponent(name).replaceAll('/', '')+'/');
+                    await loadTree();
                 })
                 function closeFile(path) {
                     if (document.getElementById(path)) {
@@ -185,7 +256,7 @@
                 }
                 document.getElementById('save').addEventListener('click', save);
                 document.addEventListener('keydown', function(e) {
-                    if (!['tab', 'meta', 'shift', 'control', 'alt', 'escape'].includes(e.key.toLowerCase()) && !e.key.toLowerCase().includes('arrow') && !(e.ctrlKey || e.key.toLowerCase() === 'v')) {
+                    if ((!['tab', 'meta', 'shift', 'control', 'alt', 'escape'].includes(e.key.toLowerCase()) && !e.key.toLowerCase().includes('arrow') && !e.ctrlKey && !e.altKey) || (('vzyd').split('').includes(e.key.toLowerCase()) && e.ctrlKey)) {
                         document.getElementById('save').innerText = 'Save*';
                         window.openFilesData[window.currentPath.path].saved = false;
                         window.currentPath.saved = true;
@@ -195,6 +266,17 @@
                         e.preventDefault();
                     }
                 })
+                window.newFile = function(basePath) {
+                    var name = prompt('enter file name');
+                    if (!name) return;
+                    chooseFile(null, basePath+(decodeURIComponent(name).replaceAll('/', '')));
+                }
+                window.newFolder = async function(basePath) {
+                    var name = prompt('enter folder name');
+                    if (!name) return;
+                    await updateTree(basePath+(decodeURIComponent(name).replaceAll('/', ''))+'/');
+                    await loadTree();
+                }
                 async function loadTree() {
                     var tree = await get('fileTree?');
                     if (!tree) {
@@ -236,7 +318,11 @@
                                     q=' caret-down';
                                     b=' active';
                                 }
-                                html += '<li><span class="caret'+q+'" value="'+encode(a[i].path, '"')+'">'+encode(a[i].name, 'html')+'</span><ul class="nested'+b+'">';
+                                html += '<li><span class="caret'+q+'" value="'+encode(a[i].path, '"')+'">'+encode(a[i].name, true)+'</span>'
+                                if (a[i].path !== '/') {
+                                    html += ' - <a href="javascript:void(0)" onclick="deleteFolder(\''+encode(a[i].path)+'\')">delete</a>';
+                                }
+                                html += '<ul class="nested'+b+'"><button class="koolButton" onclick="newFile(\''+encode(a[i].path)+'\')">New File</button> <button class="koolButton" onclick="newFolder(\''+encode(a[i].path, true)+'\')">New Folder</button>';
                                 processFiles(a[i].children);
                                 html += '</ul></li>';
                             } else {
@@ -244,7 +330,7 @@
                                 var n = a[i].name.split('.').pop().toLowerCase();
                                 var editable = (MIMECATEGORIES.text.includes(n) || mime.includes(n) || !a[i].name.includes('.'));
                                 html += '<li>';
-                                html += '<a style="text-decoration:none" href="javascript:void(0)" value="'+encode(a[i].path, '"')+'" '+(editable?'onclick="chooseFile(event);"':'')+'>'+encode(a[i].name, 'html')+'</a> - <a href="javascript:void(0)" onclick="rename(\''+encode(a[i].path, true)+'\')">rename</a> - <a href="javascript:void(0)" onclick="deleteFile(\''+encode(a[i].path, "'")+'\')">delete</a></li>';
+                                html += '<a style="text-decoration:none" href="javascript:void(0)" value="'+encode(a[i].path)+'" '+(editable?'onclick="chooseFile(event);"':'')+'>'+encode(a[i].name, true)+'</a> - <a href="javascript:void(0)" onclick="rename(\''+encode(a[i].path)+'\')">rename</a> - <a href="javascript:void(0)" onclick="deleteFile(\''+encode(a[i].path)+'\')">delete</a></li>';
                             }
                         }
                     }
@@ -271,6 +357,7 @@
                                 this.classList.remove("drag");
                                 var items = e.dataTransfer.items;
                                 if (items) {
+                                    var files = [];
                                     for (var i=0; i<items.length; i++) {
                                         var item = items[i];
                                         if (item.kind === 'string' && item.type.match('^text/html')) {
@@ -295,26 +382,29 @@
                                                 }
                                             });
                                         } else if (item.kind === 'file') {
-                                            var file = item.getAsFile();
-                                            var path = currentFolder+file.name;
-                                            var default_types = ['text/html',
-                                                                 'text/xml',
-                                                                 'text/plain',
-                                                                 "text/vnd.wap.wml",
-                                                                 "application/javascript",
-                                                                 "application/rss+xml"]
-                                            var type = MIMETYPES[path.split('.').pop()];
-                                            if (type && default_types.includes(type)) {
-                                                type += '; charset=utf-8';
-                                            }
-                                            var data = {
-                                                data: await file.arrayBuffer(),
-                                                type: type || ''
-                                            }
-                                            await updateTree(path);
-                                            await put(path, data);
-                                            await loadTree();
+                                            files.push(item.getAsFile());
                                         }
+                                    }
+                                    for (var i=0; i<files.length; i++) {
+                                        var file = files[i];
+                                        var path = currentFolder+file.name;
+                                        var default_types = ['text/html',
+                                                             'text/xml',
+                                                             'text/plain',
+                                                             "text/vnd.wap.wml",
+                                                             "application/javascript",
+                                                             "application/rss+xml"]
+                                        var type = MIMETYPES[path.split('.').pop()];
+                                        if (type && default_types.includes(type)) {
+                                            type += '; charset=utf-8';
+                                        }
+                                        var data = {
+                                            data: await file.arrayBuffer(),
+                                            type: type || ''
+                                        }
+                                        await updateTree(path);
+                                        await put(path, data);
+                                        await loadTree();
                                     }
                                 }
                             };

@@ -14,6 +14,7 @@ addEventListener("fetch", (e) => {
 addEventListener('install', function(e) {
     e.waitUntil(
         (async () => {
+            caches.delete('files');
             var cache = await caches.open('files');
             return cache.addAll([
                 '/index.html?bypass=1',
