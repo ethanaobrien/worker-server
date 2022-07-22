@@ -19,7 +19,8 @@ async function putOpts() {
 }
 
 async function submitPressed(files, zip, deleteExisting, baseFolder) {
-    if (window.processing) return;
+    if (!files && arguments[0]) files = arguments[0];
+    if (window.processing || !files) return;
     window.processing = true;
     await putOpts();
     if (!files.length && !zip) {
@@ -136,7 +137,9 @@ function humanFileSize(bytes) {
 }
 
 async function setSize() {
-    if (document.getElementById('size')) {
+    if (typeof navigator.storage.estimate != 'function') {
+        document.getElementById('size').innerText = 'Cannot detect storage used';
+    } else if (document.getElemesntById('size')) {
         var size = humanFileSize((await navigator.storage.estimate()).usageDetails.indexedDB);
         document.getElementById('size').innerText = 'Storage used: '+(size||0);
     }
