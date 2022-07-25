@@ -139,7 +139,7 @@ function humanFileSize(bytes) {
 async function setSize() {
     if (typeof navigator.storage.estimate != 'function') {
         document.getElementById('size').innerText = 'Cannot detect storage used';
-    } else if (document.getElemesntById('size')) {
+    } else if (document.getElementById('size')) {
         var size = humanFileSize((await navigator.storage.estimate()).usageDetails.indexedDB);
         document.getElementById('size').innerText = 'Storage used: '+(size||0);
     }
@@ -154,10 +154,11 @@ function visibilityDependency(id1, id2) {
     })
 }
 
-function fetchZip(zip) {
+function fetchZip(zip, adhs, disp, check4UnAuth) {
     const msg = document.getElementById('message');
     return new Promise(function(resolve, reject) {
         var xhr = new XMLHttpRequest();
+        if (!adhs) adhs = {};
         xhr.responseType = "arraybuffer";
         xhr.onload = async function(e) {
             var status = xhr.status;
@@ -165,33 +166,89 @@ function fetchZip(zip) {
             if (status === 0 || (status >= 200 && status < 300)) {
                 resolve(xhr.response)
             } else if ([301, 302, 307].includes(status) && location) {
-                resolve(await fetchZip(location));
+                resolve(await fetchZip(location, adhs, disp, check4UnAuth));
+            } else if (check4UnAuth && status === 403 && xhr.getResponseHeader("content-type").includes('json')) {
+                var a = JSON.parse(new TextDecoder().decode(xhr.response));
+                reject(a);
             } else {
                 reject({status, body:xhr.response});
             }
         }
         xhr.open("GET", zip);
+        for (var k in adhs) {
+            xhr.setRequestHeader(k, adhs[k]);
+        }
         xhr.onerror = function(e) {
             reject();
         }
         xhr.onprogress = function(e) {
-            msg.innerHTML = 'Downloading zip '+humanFileSize(e.loaded);
+            if (disp !== false) {
+                msg.innerHTML = 'Downloading zip '+humanFileSize(e.loaded);
+            }
         }
         xhr.send();
     })
 }
 
+async function str2ab(binary) {
+    var a = await fetch('data:text/plain;base64,'+binary);
+    return await a.arrayBuffer();
+}
+
 async function githubImport() {
-    //find way around cors
     const msg = document.getElementById('message');
-    var url = prompt('enter github repo url');
+    var url = prompt('Enter github repo url');
+    var auth = prompt("Enter github auth token (used to extend request limits)");
+    var branch = prompt("Enter branch") || "main";
     if (!url) return;
     var parts = url.split('://').pop().split('/');
-    var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/zipball/main';
+    var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/trees/'+branch;
+    var headers = {
+        "Accept":"application/vnd.github+json"
+    };
+    if (auth) {
+        headers['Authorization'] = "token "+auth;
+    } else {
+        alert("warning -- limit of 60 requests without auth token. The chances of failing are very likely.");
+    }
+    var paths = [];
+    async function downloadAndStore(file, cp) {
+        var c = await fetchZip(file, headers, false, true);
+        var a = JSON.parse(new TextDecoder().decode(c)).tree;
+        for (var i=0; i<a.length; i++) {
+            if (a[i].type === 'blob') {
+                try {
+                    var ct1 = JSON.parse(new TextDecoder().decode(await fetchZip(a[i].url, headers, false, (true))));
+                    var contents = await str2ab(ct1.content);
+                    paths.push({
+                        webkitRelativePath: cp+'/'+a[i].path,
+                        data: contents
+                    });
+                } catch(e) {
+                    continue;
+                }
+            } else if (a[i].type === 'tree') {
+                await downloadAndStore(a[i].url, cp+'/'+a[i].path);
+            }
+        }
+    }
+    msg.innerHTML = "Downloading...";
     try {
-        var res = await fetchZip(downloadLink);
-        await submitPressed([], res, isChecked('deleteExisting'), isChecked('baseFolder'));
+        await downloadAndStore(downloadLink, '/');
     } catch(e) {
+        if (!e.message) {
+            msg.innerHTML = "Error";
+        } else {
+            msg.innerHTML = e.message;
+        }
+        console.warn(e);
+        return;
+    }
+    msg.innerHTML = "Done Downloading";
+    try {
+        await submitPressed(paths, null, isChecked('deleteExisting'), isChecked('baseFolder'));
+    } catch(e) {
+        console.warn(e);
         return;
     }
 }
