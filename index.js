@@ -190,73 +190,7 @@ function fetchZip(zip, adhs, disp, check4UnAuth) {
     })
 }
 
-async function str2ab(binary) {
-    var a = await fetch('data:text/plain;base64,'+binary);
-    return await a.arrayBuffer();
-}
-
-async function githubImport() {
-    const msg = document.getElementById('message');
-    var url = prompt('Enter github repo url');
-    var auth = prompt("Enter github auth token (used to extend request limits)");
-    var branch = prompt("Enter branch") || "main";
-    if (!url) return;
-    var parts = url.split('://').pop().split('/');
-    var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/trees/'+branch;
-    var headers = {
-        "Accept":"application/vnd.github+json"
-    };
-    if (auth) {
-        headers['Authorization'] = "token "+auth;
-    } else {
-        alert("warning -- limit of 60 requests without auth token. The chances of failing are very likely.");
-    }
-    var paths = [];
-    async function downloadAndStore(file, cp) {
-        var c = await fetchZip(file, headers, false, true);
-        var a = JSON.parse(new TextDecoder().decode(c)).tree;
-        for (var i=0; i<a.length; i++) {
-            if (a[i].type === 'blob') {
-                try {
-                    var ct1 = JSON.parse(new TextDecoder().decode(await fetchZip(a[i].url, headers, false, (true))));
-                    var contents = await str2ab(ct1.content);
-                    paths.push({
-                        webkitRelativePath: cp+'/'+a[i].path,
-                        data: contents
-                    });
-                } catch(e) {
-                    continue;
-                }
-            } else if (a[i].type === 'tree') {
-                await downloadAndStore(a[i].url, cp+'/'+a[i].path);
-            }
-        }
-    }
-    msg.innerHTML = "Downloading...";
-    try {
-        await downloadAndStore(downloadLink, '/');
-    } catch(e) {
-        if (!e.message) {
-            msg.innerHTML = "Error";
-        } else {
-            msg.innerHTML = e.message;
-        }
-        console.warn(e);
-        return;
-    }
-    msg.innerHTML = "Done Downloading";
-    try {
-        await submitPressed(paths, null, isChecked('deleteExisting'), isChecked('baseFolder'));
-    } catch(e) {
-        console.warn(e);
-        return;
-    }
-}
-
 window.addEventListener('DOMContentLoaded', async function() {
-    if (document.getElementById('github')) {
-        document.getElementById('github').addEventListener('click', githubImport);
-    }
     var opts = await get('opts?');
     if (!opts) opts = {};
     for (var k in opts) {
