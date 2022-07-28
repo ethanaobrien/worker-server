@@ -1,359 +1,378 @@
-<p id="message"></p>
-<script src="utils.js?bypass=1"></script>
-<script src="mime.js?bypass=1"></script>
-<div id="main">
-    <p>Current Repositories</p>
-    <div id="list"></div>
-    <br><br>
-    <button id="push">Push Changes</button>
-    <br><br>
-    <button id="clone">Clone New</button>
-</div>
-<div id="cloneOpts" style="display:none;">
-    <br><br>
-    Auth Token: <input type="text" id="authToken">
-    <br><br>
-    Repository URL: <input type="text" id="repositoryURL">
-    <br><br>
-    <button id="next">Next</button>
-</div>
-<div id="branches" style="display:none;"></div>
-<div id="pushOpts" style="display:none;">
-    <br><br>
-    Auth Token: <input type="text" id="authToken2">
-    <br><br>
-    Name: <input type="text" id="name">
-    <br><br>
-    Email: <input type="text" id="email">
-    <br><br>
-    Commit Message: <input type="text" id="commitMsg">
-    <br><br>
-    <button id="next2">Next</button>
-</div>
-<script>
-    function isChecked() {
-        return false;
-    }
+<html>
+    <head>
+        <title>Worker Server Git Manager</title>
+        <link rel="icon" type="image/x-icon" href="/favicon.ico?bypass=1">
+        <script src="utils.js?bypass=1"></script>
+        <script src="mime.js?bypass=1"></script>
+    </head>
+    <body style="padding: 20px;">
+        <p><a href="/?bypass=1">Home</a></p>
+        <p id="message"></p>
+        <div id="main">
+            <p>Current Repositories</p>
+            <div id="list"></div>
+            <br><br>
+            <button id="push">Push Changes</button>
+            <br><br>
+            <button id="clone">Clone New</button>
+        </div>
+        <div id="cloneOpts" style="display:none;">
+            <br><br>
+            Auth Token: <input type="text" id="authToken">
+            <br><br>
+            Repository URL: <input type="text" id="repositoryURL">
+            <br><br>
+            <button id="next">Next</button>
+        </div>
+        <div id="branches" style="display:none;"></div>
+        <div id="pushOpts" style="display:none;">
+            <br><br>
+            Auth Token: <input type="text" id="authToken2">
+            <br><br>
+            Name: <input type="text" id="name">
+            <br><br>
+            Email: <input type="text" id="email">
+            <br><br>
+            Commit Message: <input type="text" id="commitMsg">
+            <br><br>
+            <button id="next2">Next</button>
+        </div>
+        <script>
+            function isChecked() {
+                return false;
+            }
 
-    async function submitPressed(files, zip, deleteExisting, baseFolder) {
-        await processFiles(files, files[0].webkitRelativePath.split('/')[0], baseFolder);
-    }
-    async function processFiles(files, basePath, baseFolder, isZip) {
-        var paths = await get('paths?');
-        if (!paths) paths = [];
-        for (var i=0; i<files.length; i++) {
-            document.getElementById('message').innerHTML = 'Processing files '+i+'/'+files.length;
-            var path = files[i].webkitRelativePath;
-            paths.push(path);
-            var default_types = ['text/html',
-                                 'text/xml',
-                                 'text/plain',
-                                 "text/vnd.wap.wml",
-                                 "application/javascript",
-                                 "application/rss+xml"]
-            var type = window.MIMETYPES[path.split('.').pop()];
-            if (type && default_types.includes(type)) {
-                type += '; charset=utf-8';
+            async function submitPressed(files, zip, deleteExisting, baseFolder) {
+                await processFiles(files, files[0].webkitRelativePath.split('/')[0], baseFolder);
             }
-            var data = {
-                type: type || ''
-            }
-            if (files[i].data) {
-                data.data = files[i].data;
-            } else {
-                data.data = await (new Blob([files[i]])).arrayBuffer();
-            }
-            await put(path, data);
-        }
-        document.getElementById('message').innerHTML = 'Processing file tree';
-        await put('fileTree?', getFileTree(paths));
-        await put('paths?', paths);
-    }
-    function _arrayBufferToBase64(buffer) {
-        var binary = '';
-        var bytes = new Uint8Array(buffer);
-        var len = bytes.byteLength;
-        for (var i = 0; i<len; i++) {
-            binary += String.fromCharCode(bytes[i]);
-        }
-        return window.btoa(binary);
-    }
-    async function push(url, auth, branch, name, email, commitMessage) {
-        const msg = document.getElementById('message');
-        msg.innerHTML = 'Pushing Changes';
-        var parts = url.split('://').pop().split('/');
-        var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches/'+branch;
-        var headers = {
-            "Accept": "application/vnd.github+json",
-            "Content-Type": "application/json"
-        };
-        headers['Authorization'] = "token "+auth;
-        var last_commit_sha = JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true))).commit.sha;
-        console.log(last_commit_sha)
-        var tree = (await get('fileTree?'))[0].children;
-        var gitBase = function(name) {
-            for (var i=0; i<tree.length; i++) {
-                if (tree[i].name === name) return tree[i];
-            }
-        }(parts[2]);
-        var dataToPush = [];
-        async function process(data, startReplace) {
-            for (var i=0; i<data.length; i++) {
-                if (data[i].isDirectory) {
-                    await process(data[i].children, startReplace);
-                } else {
-                    dataToPush.push({
-                        "path": data[i].path.replace(startReplace, ''),
-                        "mode": "100644",
-                        "type": "blob",
-                        "sha": JSON.parse(new TextDecoder().decode(await fetchZip('https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/blobs', headers, false, true, "POST", JSON.stringify({"encoding": "base64", "content":_arrayBufferToBase64((await get(data[i].path)).data)})))).sha
-                    });
-                }
-            }
-        }
-        await process(gitBase.children, gitBase.path);
-        var tree_sha = JSON.parse(new TextDecoder().decode(await fetchZip('https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/trees', headers, false, true, "POST", JSON.stringify({
-            "base_tree": last_commit_sha,
-            "tree": dataToPush
-        })))).sha
-
-        var new_commit_sha = JSON.parse(new TextDecoder().decode(await fetchZip('https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/commits', headers, false, true, "POST", JSON.stringify({
-            "message": commitMessage,
-            "author": {
-                "name": name,
-                "email": email,
-            },
-            "parents": [
-                last_commit_sha
-            ],
-            "tree": tree_sha
-        })))).sha
-        var new_commit_sha = JSON.parse(new TextDecoder().decode(await fetchZip('https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/refs/heads/'+branch, headers, false, true, "POST", JSON.stringify({
-            "ref": "refs/heads/"+branch,
-            "sha": new_commit_sha
-        })))).object.sha;
-        console.log(new_commit_sha);
-        msg.innerHTML = '<a href="https://github.com/'+parts[1]+'/'+parts[2]+'/commit/'+new_commit_sha+'" target="_blank">View Diff</a>';
-    }
-    async function clone(url, auth, branch) {
-        const msg = document.getElementById('message');
-        var parts = url.split('://').pop().split('/');
-        var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/trees/'+branch;
-        var headers = {
-            "Accept":"application/vnd.github+json",
-            "Authorization":  "token "+auth
-        };
-        var paths = [];
-        async function downloadAndStore(file, cp) {
-            var c = await fetchZip(file, headers, false, true);
-            var a = JSON.parse(new TextDecoder().decode(c)).tree;
-            for (var i=0; i<a.length; i++) {
-                if (a[i].type === 'blob') {
-                    try {
-                        var ct1 = JSON.parse(new TextDecoder().decode(await fetchZip(a[i].url, headers, false, (true))));
-                        var contents = await str2ab(ct1.content);
-                        paths.push({
-                            webkitRelativePath: ('/'+parts[2]+cp+'/'+a[i].path).split('//').join('/'),
-                            data: contents
-                        });
-                    } catch(e) {
-                        continue;
+            async function processFiles(files, basePath, baseFolder, isZip) {
+                var paths = await get('paths?');
+                if (!paths) paths = [];
+                for (var i=0; i<files.length; i++) {
+                    document.getElementById('message').innerHTML = 'Processing files '+i+'/'+files.length;
+                    var path = files[i].webkitRelativePath;
+                    paths.push(path);
+                    var default_types = ['text/html',
+                                         'text/xml',
+                                         'text/plain',
+                                         "text/vnd.wap.wml",
+                                         "application/javascript",
+                                         "application/rss+xml"]
+                    var type = window.MIMETYPES[path.split('.').pop()];
+                    if (type && default_types.includes(type)) {
+                        type += '; charset=utf-8';
                     }
-                } else if (a[i].type === 'tree') {
-                    await downloadAndStore(a[i].url, cp+'/'+a[i].path);
+                    var data = {
+                        type: type || ''
+                    }
+                    if (files[i].data) {
+                        data.data = files[i].data;
+                    } else {
+                        data.data = await (new Blob([files[i]])).arrayBuffer();
+                    }
+                    await put(path, data);
                 }
+                document.getElementById('message').innerHTML = 'Processing file tree';
+                await put('fileTree?', getFileTree(paths));
+                await put('paths?', paths);
             }
-        }
-        msg.innerHTML = "Downloading...";
-        try {
-            await downloadAndStore(downloadLink, '/');
-        } catch(e) {
-            if (!e.message) {
-                msg.innerHTML = "Error";
-            } else {
-                msg.innerHTML = e.message;
-            }
-            console.warn(e);
-            return;
-        }
-        msg.innerHTML = "Done Downloading";
-        try {
-            await submitPressed(paths, null, isChecked('deleteExisting'), isChecked('baseFolder'));
-        } catch(e) {
-            console.warn(e);
-            return;
-        }
-        msg.innerHTML = "";
-    }
-    function fetchZip(zip, adhs, disp, check4UnAuth, method, data) {
-        const msg = document.getElementById('message');
-        return new Promise(function(resolve, reject) {
-            var xhr = new XMLHttpRequest();
-            if (!adhs) adhs = {};
-            xhr.responseType = "arraybuffer";
-            xhr.onload = async function(e) {
-                var status = xhr.status;
-                var location = xhr.getResponseHeader("location");
-                if (status === 0 || (status >= 200 && status < 300)) {
-                    resolve(xhr.response)
-                } else if ([301, 302, 307].includes(status) && location) {
-                    resolve(await fetchZip(location, adhs, disp, check4UnAuth));
-                } else if (check4UnAuth && status === 403 && xhr.getResponseHeader("content-type").includes('json')) {
-                    var a = JSON.parse(new TextDecoder().decode(xhr.response));
-                    reject(a);
-                } else {
-                    reject({status, body:xhr.response});
+            function _arrayBufferToBase64(buffer) {
+                var binary = '';
+                var bytes = new Uint8Array(buffer);
+                var len = bytes.byteLength;
+                for (var i = 0; i<len; i++) {
+                    binary += String.fromCharCode(bytes[i]);
                 }
+                return window.btoa(binary);
             }
-            xhr.open(method || "GET", zip);
-            for (var k in adhs) {
-                xhr.setRequestHeader(k, adhs[k]);
-            }
-            xhr.onerror = function(e) {
-                reject();
-            }
-            xhr.onprogress = function(e) {
-                if (disp !== false) {
-                    msg.innerHTML = 'Downloading zip '+humanFileSize(e.loaded);
-                }
-            }
-            xhr.send(data);
-        })
-    }
-
-    async function str2ab(binary) {
-        var a = await fetch('data:text/plain;base64,'+binary);
-        return await a.arrayBuffer();
-    }
-    async function addToGit(name) {
-        var git = await get('gitData?');
-        if (!git) git=[];
-        var includes = false;
-        for (var i=0; i<git.length; i++) {
-            if (git[i].name === name.name) {
-                return;
-            }
-        }
-        git.push(name);
-        await put('gitData?', git);
-    }
-    async function saveKey(key) {
-        await put('gitKey?', key);
-    }
-    async function saveGitOpts(opts) {
-        await put('gitConfig?', opts);
-    }
-    document.getElementById('next').addEventListener('click', async function() {
-        var opts = {
-            auth: document.getElementById('authToken').value,
-            url: document.getElementById('repositoryURL').value
-        }
-        if (!opts.auth||!opts.url) return;
-        await saveKey(opts.auth);
-        var headers = {
-            "Accept":"application/vnd.github+json",
-            "Authorization":  "token "+opts.auth
-        };
-        var parts = opts.url.split('://').pop().split('/');
-        var branchez = document.getElementById('branches');
-        var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches';
-        var branches = JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true)));
-        document.getElementById('cloneOpts').style = 'display:none;';
-        branchez.innerHTML = 'Which branch do you want to clone?<br><br>';
-        for (var i=0; i<branches.length; i++) {
-            branchez.innerHTML += '<input type="radio" id="'+branches[i].name+'" value="'+branches[i].name+'" name="branchSelection"><label for="'+branches[i].name+'">'+branches[i].name+'</label><br>';
-        }
-        branchez.innerHTML += '<br><button>Clone</button>';
-        branchez.style = '';
-        branchez.getElementsByTagName('button')[0].addEventListener('click', async function() {
-            branchez.style = 'display:none;';
-            var q;
-            var radios = document.getElementsByName('branchSelection');
-            for (var i=0; i<radios.length; i++) {
-                if (radios[i].checked) {
-                    q = radios[i].value;
-                    break;
+            async function push(url, auth, branch, name, email, commitMessage) {
+                const msg = document.getElementById('message');
+                msg.innerHTML = 'Pushing Changes';
+                var parts = url.split('://').pop().split('/');
+                var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches/'+branch;
+                var headers = {
+                    "Accept": "application/vnd.github+json",
+                    "Content-Type": "application/json"
                 };
-            };
-            if (!q) return;
-            await clone(opts.url, opts.auth, q);
-            await addToGit({name:parts[2],branch:q,url:opts.url});
-            window.location.reload();
-        })
-    });
-    document.getElementById('clone').addEventListener('click', function() {
-        document.getElementById('main').style = 'display:none;';
-        document.getElementById('cloneOpts').style = '';
-    })
-    document.getElementById('push').addEventListener('click', function() {
-        var q;
-        var radios = document.getElementsByName('branchSelected');
-        for (var i=0; i<radios.length; i++) {
-            if (radios[i].checked) {
-                q = radios[i].value;
-                break;
-            };
-        };
-        if (!q) return;
-        document.getElementById('next2').addEventListener('click', async function() {
-            var opts = {
-                auth: document.getElementById('authToken2').value,
-                commitMsg: document.getElementById('commitMsg').value,
-                name: document.getElementById('name').value,
-                email: document.getElementById('email').value
-            };
-            var url = await async function() {
-                var git = await get('gitData?');
-                if (!git) git=[];
-                for (var i=0; i<git.length; i++) {
-                    if (git[i].name === q) {
-                        return git[i].url;
+                headers['Authorization'] = "token "+auth;
+                var last_commit_sha = JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true))).commit.sha;
+                console.log(last_commit_sha)
+                var tree = (await get('fileTree?'))[0].children;
+                var gitBase = function(name) {
+                    for (var i=0; i<tree.length; i++) {
+                        if (tree[i].name === name) return tree[i];
+                    }
+                }(parts[2]);
+                var dataToPush = [];
+                async function process(data, startReplace) {
+                    for (var i=0; i<data.length; i++) {
+                        if (data[i].isDirectory) {
+                            await process(data[i].children, startReplace);
+                        } else {
+                            dataToPush.push({
+                                "path": data[i].path.replace(startReplace, ''),
+                                "mode": "100644",
+                                "type": "blob",
+                                "sha": JSON.parse(new TextDecoder().decode(await fetchZip('https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/blobs', headers, false, true, "POST", JSON.stringify({"encoding": "base64", "content":_arrayBufferToBase64((await get(data[i].path)).data)})))).sha
+                            });
+                        }
                     }
                 }
-            }();
-            for (var k in opts) {
-                if (!opts[k]) return;
+                await process(gitBase.children, gitBase.path);
+                var tree_sha = JSON.parse(new TextDecoder().decode(await fetchZip('https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/trees', headers, false, true, "POST", JSON.stringify({
+                    "base_tree": last_commit_sha,
+                    "tree": dataToPush
+                })))).sha
+
+                var new_commit_sha = JSON.parse(new TextDecoder().decode(await fetchZip('https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/commits', headers, false, true, "POST", JSON.stringify({
+                    "message": commitMessage,
+                    "author": {
+                        "name": name,
+                        "email": email,
+                    },
+                    "parents": [
+                        last_commit_sha
+                    ],
+                    "tree": tree_sha
+                })))).sha
+                var new_commit_sha = JSON.parse(new TextDecoder().decode(await fetchZip('https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/refs/heads/'+branch, headers, false, true, "POST", JSON.stringify({
+                    "ref": "refs/heads/"+branch,
+                    "sha": new_commit_sha
+                })))).object.sha;
+                console.log(new_commit_sha);
+                msg.innerHTML = '<a href="https://github.com/'+parts[1]+'/'+parts[2]+'/commit/'+new_commit_sha+'" target="_blank">View Diff</a>';
             }
-            var parts = url.split('://').pop().split('/');
-            await saveGitOpts({email:opts.email,name:opts.name});
-            var branch = await async function() {
-                var git = await get('gitData?');
-                if (!git) git=[];
-                for (var i=0; i<git.length; i++) {
-                    if (git[i].name === parts[2]) {
-                        return git[i].branch;
+            async function clone(url, auth, branch) {
+                const msg = document.getElementById('message');
+                var parts = url.split('://').pop().split('/');
+                var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/trees/'+branch;
+                var headers = {
+                    "Accept":"application/vnd.github+json",
+                    "Authorization":  "token "+auth
+                };
+                var paths = [];
+                async function downloadAndStore(file, cp) {
+                    var c = await fetchZip(file, headers, false, true);
+                    var a = JSON.parse(new TextDecoder().decode(c)).tree;
+                    for (var i=0; i<a.length; i++) {
+                        if (a[i].type === 'blob') {
+                            try {
+                                var ct1 = JSON.parse(new TextDecoder().decode(await fetchZip(a[i].url, headers, false, (true))));
+                                var contents = await str2ab(ct1.content);
+                                paths.push({
+                                    webkitRelativePath: ('/'+parts[2]+cp+'/'+a[i].path).split('//').join('/'),
+                                    data: contents
+                                });
+                            } catch(e) {
+                                continue;
+                            }
+                        } else if (a[i].type === 'tree') {
+                            await downloadAndStore(a[i].url, cp+'/'+a[i].path);
+                        }
                     }
                 }
-            }();
-            document.getElementById('pushOpts').style = 'display:none;';
-            await push(url, opts.auth, branch, opts.name, opts.email, opts.commitMsg);
-        })
-        document.getElementById('main').style = 'display:none;';
-        document.getElementById('pushOpts').style = '';
-    });
-    window.addEventListener('load', async function() {
-        var key = await get('gitKey?');
-        if (key) {
-            document.getElementById('authToken').value = key;
-            document.getElementById('authToken2').value = key;
-        };
-        var list = document.getElementById('list');
-        var git = await get('gitData?');
-        if (!git) {
-            await put('gitData?', []);
-            git = [];
-        }
-        for (var i=0; i<git.length; i++) {
-            list.innerHTML += '<input type="radio" id="'+git[i].name+'" value="'+git[i].name+'" name="branchSelected"><label for="'+git[i].name+'"><a href="'+git[i].url+'" target="_blank">'+git[i].name+'</a></label><br>';
-        }
-        var ne = await get('gitConfig?');
-        if (!ne) ne={};
-        if (ne.name) {
-            document.getElementById('name').value = ne.name;
-        }
-        if (ne.email) {
-            document.getElementById('email').value = ne.email;
-        }
-    })
-</script>
+                msg.innerHTML = "Downloading...";
+                try {
+                    await downloadAndStore(downloadLink, '/');
+                } catch(e) {
+                    if (!e.message) {
+                        msg.innerHTML = "Error";
+                    } else {
+                        msg.innerHTML = e.message;
+                    }
+                    console.warn(e);
+                    return;
+                }
+                msg.innerHTML = "Done Downloading";
+                try {
+                    await submitPressed(paths, null, isChecked('deleteExisting'), isChecked('baseFolder'));
+                } catch(e) {
+                    console.warn(e);
+                    return;
+                }
+                msg.innerHTML = "";
+            }
+            function fetchZip(zip, adhs, disp, check4UnAuth, method, data) {
+                const msg = document.getElementById('message');
+                return new Promise(function(resolve, reject) {
+                    var xhr = new XMLHttpRequest();
+                    if (!adhs) adhs = {};
+                    xhr.responseType = "arraybuffer";
+                    xhr.onload = async function(e) {
+                        var status = xhr.status;
+                        var location = xhr.getResponseHeader("location");
+                        if (status === 0 || (status >= 200 && status < 300)) {
+                            resolve(xhr.response)
+                        } else if ([301, 302, 307].includes(status) && location) {
+                            resolve(await fetchZip(location, adhs, disp, check4UnAuth));
+                        } else if (check4UnAuth && status === 403 && xhr.getResponseHeader("content-type").includes('json')) {
+                            var a = JSON.parse(new TextDecoder().decode(xhr.response));
+                            reject(a);
+                        } else {
+                            reject({status, body:xhr.response});
+                        }
+                    }
+                    xhr.open(method || "GET", zip);
+                    for (var k in adhs) {
+                        xhr.setRequestHeader(k, adhs[k]);
+                    }
+                    xhr.onerror = function(e) {
+                        reject();
+                    }
+                    xhr.onprogress = function(e) {
+                        if (disp !== false) {
+                            msg.innerHTML = 'Downloading zip '+humanFileSize(e.loaded);
+                        }
+                    }
+                    xhr.send(data);
+                })
+            }
+
+            async function str2ab(binary) {
+                var a = await fetch('data:text/plain;base64,'+binary);
+                return await a.arrayBuffer();
+            }
+            async function addToGit(name) {
+                var git = await get('gitData?');
+                if (!git) git=[];
+                var includes = false;
+                for (var i=0; i<git.length; i++) {
+                    if (git[i].name === name.name) {
+                        return;
+                    }
+                }
+                git.push(name);
+                await put('gitData?', git);
+            }
+            async function saveKey(key) {
+                await put('gitKey?', key);
+            }
+            async function saveGitOpts(opts) {
+                await put('gitConfig?', opts);
+            }
+            document.getElementById('next').addEventListener('click', async function() {
+                window.processing = true;
+                var opts = {
+                    auth: document.getElementById('authToken').value,
+                    url: document.getElementById('repositoryURL').value
+                }
+                if (!opts.auth||!opts.url) return;
+                await saveKey(opts.auth);
+                var headers = {
+                    "Accept":"application/vnd.github+json",
+                    "Authorization":  "token "+opts.auth
+                };
+                var parts = opts.url.split('://').pop().split('/');
+                var branchez = document.getElementById('branches');
+                var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches';
+                var branches = JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true)));
+                document.getElementById('cloneOpts').style = 'display:none;';
+                branchez.innerHTML = 'Which branch do you want to clone?<br><br>';
+                for (var i=0; i<branches.length; i++) {
+                    branchez.innerHTML += '<input type="radio" id="'+branches[i].name+'" value="'+branches[i].name+'" name="branchSelection"><label for="'+branches[i].name+'">'+branches[i].name+'</label><br>';
+                }
+                branchez.innerHTML += '<br><button>Clone</button>';
+                branchez.style = '';
+                branchez.getElementsByTagName('button')[0].addEventListener('click', async function() {
+                    branchez.style = 'display:none;';
+                    var q;
+                    var radios = document.getElementsByName('branchSelection');
+                    for (var i=0; i<radios.length; i++) {
+                        if (radios[i].checked) {
+                            q = radios[i].value;
+                            break;
+                        };
+                    };
+                    if (!q) return;
+                    await clone(opts.url, opts.auth, q);
+                    await addToGit({name:parts[2],branch:q,url:opts.url});
+                    window.processing = false;
+                    window.location.reload();
+                })
+            });
+            document.getElementById('clone').addEventListener('click', function() {
+                document.getElementById('main').style = 'display:none;';
+                document.getElementById('cloneOpts').style = '';
+            })
+            document.getElementById('push').addEventListener('click', function() {
+                var q;
+                var radios = document.getElementsByName('branchSelected');
+                for (var i=0; i<radios.length; i++) {
+                    if (radios[i].checked) {
+                        q = radios[i].value;
+                        break;
+                    };
+                };
+                if (!q) return;
+                document.getElementById('next2').addEventListener('click', async function() {
+                    window.processing = true
+                    var opts = {
+                        auth: document.getElementById('authToken2').value,
+                        commitMsg: document.getElementById('commitMsg').value,
+                        name: document.getElementById('name').value,
+                        email: document.getElementById('email').value
+                    };
+                    var url = await async function() {
+                        var git = await get('gitData?');
+                        if (!git) git=[];
+                        for (var i=0; i<git.length; i++) {
+                            if (git[i].name === q) {
+                                return git[i].url;
+                            }
+                        }
+                    }();
+                    for (var k in opts) {
+                        if (!opts[k]) return;
+                    }
+                    var parts = url.split('://').pop().split('/');
+                    await saveGitOpts({email:opts.email,name:opts.name});
+                    var branch = await async function() {
+                        var git = await get('gitData?');
+                        if (!git) git=[];
+                        for (var i=0; i<git.length; i++) {
+                            if (git[i].name === parts[2]) {
+                                return git[i].branch;
+                            }
+                        }
+                    }();
+                    document.getElementById('pushOpts').style = 'display:none;';
+                    await push(url, opts.auth, branch, opts.name, opts.email, opts.commitMsg);
+                    window.processing = false;
+                })
+                document.getElementById('main').style = 'display:none;';
+                document.getElementById('pushOpts').style = '';
+            });
+            window.addEventListener('load', async function() {
+                var key = await get('gitKey?');
+                if (key) {
+                    document.getElementById('authToken').value = key;
+                    document.getElementById('authToken2').value = key;
+                };
+                var list = document.getElementById('list');
+                var git = await get('gitData?');
+                if (!git) {
+                    await put('gitData?', []);
+                    git = [];
+                }
+                for (var i=0; i<git.length; i++) {
+                    list.innerHTML += '<input type="radio" id="'+git[i].name+'" value="'+git[i].name+'" name="branchSelected"><label for="'+git[i].name+'"><a href="'+git[i].url+'" target="_blank">'+git[i].name+'</a></label><br>';
+                }
+                var ne = await get('gitConfig?');
+                if (!ne) ne={};
+                if (ne.name) {
+                    document.getElementById('name').value = ne.name;
+                }
+                if (ne.email) {
+                    document.getElementById('email').value = ne.email;
+                }
+            })
+            window.addEventListener('beforeunload', function(e) {
+                if (window.processing) {
+                    e.preventDefault();
+                    return e.returnValue = "You may loose data if you exit now";
+                }
+            })
+        </script>
+    </body>
+</html>
 
