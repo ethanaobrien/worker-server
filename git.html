@@ -14,11 +14,15 @@
             <br><br>
             <button id="push">Push Changes</button>
             <br><br>
+            <button id="delete">Delete</button>
+            <br><br>
+            <button id="update">Pull Changes</button>
+            <br><br>
             <button id="clone">Clone New</button>
+            <br><br><br>
+            <button id="settings">Git Settings</button>
         </div>
         <div id="cloneOpts" style="display:none;">
-            <br><br>
-            Auth Token: <input type="text" id="authToken">
             <br><br>
             Repository URL: <input type="text" id="repositoryURL">
             <br><br>
@@ -27,17 +31,25 @@
         <div id="branches" style="display:none;"></div>
         <div id="pushOpts" style="display:none;">
             <br><br>
-            Auth Token: <input type="text" id="authToken2">
+            Commit Message: <input type="text" id="commitMsg">
+            <br><br>
+            <button id="next2">Push</button>
+        </div>
+        <div id="updateSettings" style="display:none;">
+            <br><br>
+            Auth Token: <input type="text" id="authToken">
             <br><br>
             Name: <input type="text" id="name">
             <br><br>
             Email: <input type="text" id="email">
             <br><br>
-            Commit Message: <input type="text" id="commitMsg">
+            <button id="saveSettings">Save</button>
             <br><br>
-            <button id="next2">Push</button>
+            <button id="cancelSettings">Cancel</button>
         </div>
+        <p id="error" style="color:red;"></p>
         <script>
+            const error = document.getElementById('error');
             function isChecked() {
                 return false;
             }
@@ -57,7 +69,7 @@
                                          'text/plain',
                                          "text/vnd.wap.wml",
                                          "application/javascript",
-                                         "application/rss+xml"]
+                                         "application/rss+xml"];
                     var type = window.MIMETYPES[path.split('.').pop()];
                     if (type && default_types.includes(type)) {
                         type += '; charset=utf-8';
@@ -244,12 +256,6 @@
                 git.push(name);
                 await put('gitData?', git);
             }
-            async function saveKey(key) {
-                await put('gitKey?', key);
-            }
-            async function saveGitOpts(opts) {
-                await put('gitConfig?', opts);
-            }
             document.getElementById('next').addEventListener('click', async function() {
                 window.processing = true;
                 var opts = {
@@ -257,7 +263,6 @@
                     url: document.getElementById('repositoryURL').value
                 }
                 if (!opts.auth||!opts.url) return;
-                await saveKey(opts.auth);
                 var headers = {
                     "Accept":"application/vnd.github+json",
                     "Authorization":  "token "+opts.auth
@@ -283,7 +288,11 @@
                             break;
                         };
                     };
-                    if (!q) return;
+                    if (!q) {
+                        error.innerText = 'Branch not selected!';
+                        return;
+                    }
+                    error.innerText = '';
                     await clone(opts.url, opts.auth, q);
                     await addToGit({name:parts[2],branch:q,url:opts.url});
                     window.processing = false;
@@ -291,10 +300,20 @@
                 })
             });
             document.getElementById('clone').addEventListener('click', function() {
+                if (!document.getElementById('authToken').value) {
+                    error.innerText = 'Please configure git settings first!';
+                    return;
+                }
+                error.innerText = '';
                 document.getElementById('main').style = 'display:none;';
                 document.getElementById('cloneOpts').style = '';
             })
             document.getElementById('push').addEventListener('click', function() {
+                if (!document.getElementById('authToken').value||!document.getElementById('name').value||!document.getElementById('email').value) {
+                    error.innerText = 'Please configure git settings first!';
+                    return;
+                }
+                error.innerText = '';
                 var q;
                 var radios = document.getElementsByName('branchSelected');
                 for (var i=0; i<radios.length; i++) {
@@ -303,11 +322,15 @@
                         break;
                     };
                 };
-                if (!q) return;
+                if (!q) {
+                	error.innerText = 'Branch not selected!';
+                    return;
+                }
+                error.innerText = '';
                 document.getElementById('next2').addEventListener('click', async function() {
                     window.processing = true
                     var opts = {
-                        auth: document.getElementById('authToken2').value,
+                        auth: document.getElementById('authToken').value,
                         commitMsg: document.getElementById('commitMsg').value,
                         name: document.getElementById('name').value,
                         email: document.getElementById('email').value
@@ -325,7 +348,6 @@
                         if (!opts[k]) return;
                     }
                     var parts = url.split('://').pop().split('/');
-                    await saveGitOpts({email:opts.email,name:opts.name});
                     var branch = await async function() {
                         var git = await get('gitData?');
                         if (!git) git=[];
@@ -342,12 +364,105 @@
                 document.getElementById('main').style = 'display:none;';
                 document.getElementById('pushOpts').style = '';
             });
-            window.addEventListener('load', async function() {
-                var key = await get('gitKey?');
-                if (key) {
-                    document.getElementById('authToken').value = key;
-                    document.getElementById('authToken2').value = key;
+            async function del() {
+                var q;
+                var radios = document.getElementsByName('branchSelected');
+                for (var i=0; i<radios.length; i++) {
+                    if (radios[i].checked) {
+                        q = radios[i].value;
+                        break;
+                    };
                 };
+                if (!q) {
+                	error.innerText = 'Branch not selected!';
+                    return;
+                }
+                error.innerText = '';
+                var paths = await get('paths?');
+                var git = await get('gitData?');
+                if (!paths) paths = [];
+                if (!git) git = [];
+                var newPaths = [];
+                for (var i=0; i<paths.length; i++) {
+                    if (paths[i]&&paths[i].startsWith('/'+q+'/')) {
+                        await deleteF(paths[i]);
+                    } else {
+                        newPaths.push(paths[i]);
+                    }
+                }
+                await put('fileTree?', getFileTree(newPaths));
+                await put('paths?', newPaths);
+                var newGit = [];
+                console.log(git, q)
+                for (var i=0; i<git.length; i++) {
+                    if (git[i].name !== q) newGit.push(git[i]);
+                }
+                await put('gitData?', newGit);
+            }
+            document.getElementById('delete').addEventListener('click', del);
+            document.getElementById('update').addEventListener('click', async function() {
+                var q;
+                var radios = document.getElementsByName('branchSelected');
+                for (var i=0; i<radios.length; i++) {
+                    if (radios[i].checked) {
+                        q = radios[i].value;
+                        break;
+                    };
+                };
+                if (!q) {
+                	error.innerText = 'Branch not selected!';
+                    return;
+                }
+                error.innerText = '';
+                if (!window.confirm("All changes will be deleted. Continue?")) return;
+                document.getElementById('main').style = 'display:none;';
+                document.getElementById('message').innerHTML = 'Please Wait...';
+                var auth = document.getElementById('authToken').value;
+                if (!auth) return;
+                var git = await get('gitData?');
+                var opts;
+                for (var i=0; i<git.length; i++) {
+                    if (git[i].name === q) {
+                        opts = git[i];
+                        break;
+                    }
+                }
+                await del();
+                await clone(opts.url, auth, opts.branch);
+                await addToGit(opts);
+                document.getElementById('main').style = '';
+            });
+            document.getElementById('settings').addEventListener('click', function() {
+                error.innerText = '';
+                document.getElementById('main').style = 'display:none;';
+                document.getElementById('updateSettings').style = '';
+            })
+            document.getElementById('saveSettings').addEventListener('click', async function() {
+                document.getElementById('main').style = '';
+                document.getElementById('updateSettings').style = 'display:none;';
+                var opts = {
+                    name: document.getElementById('name').value,
+                    email: document.getElementById('email').value,
+                    auth: document.getElementById('authToken').value
+                };
+                await put('gitConfig?', opts);
+            })
+            document.getElementById('cancelSettings').addEventListener('click', async function() {
+                document.getElementById('main').style = '';
+                document.getElementById('updateSettings').style = 'display:none;';
+                var ne = await get('gitConfig?');
+                if (!ne) ne={};
+                if (ne.name) {
+                    document.getElementById('name').value = ne.name;
+                }
+                if (ne.email) {
+                    document.getElementById('email').value = ne.email;
+                }
+                if (ne.auth) {
+                    document.getElementById('authToken').value = ne.auth;
+                }
+            })
+            window.addEventListener('load', async function() {
                 var list = document.getElementById('list');
                 var git = await get('gitData?');
                 if (!git) {
@@ -364,6 +479,9 @@
                 }
                 if (ne.email) {
                     document.getElementById('email').value = ne.email;
+                }
+                if (ne.auth) {
+                    document.getElementById('authToken').value = ne.auth;
                 }
             })
             window.addEventListener('beforeunload', function(e) {
