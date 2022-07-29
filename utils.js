@@ -98,6 +98,7 @@ async function updateTree(path, remove, folder) {
         }
         for (var i=0; i<paths.length; i++) {
             if (paths[i].startsWith(path) && !paths[i].split(path).pop().includes('/')) {
+                await deleteF(paths[i]);
                 paths.splice(i, 1);
                 i--;
             }

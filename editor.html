@@ -115,6 +115,18 @@
                     }
                     await updateTree(path, true, true);
                     await loadTree();
+                    var git = await get('gitData?');
+                    var newGit = [];
+                    var dele;
+                    //console.log(git, q)
+                    for (var i=0; i<git.length; i++) {
+                        if (git[i].folderName !== path) newGit.push(git[i]);
+                        else dele=git[i];
+                    }
+                    await put('gitData?', newGit);
+                    var gpd = await get('gitPathData?');
+                    if (gpd[dele.owner+'-'+dele.name]) delete gpd[dele.owner+'-'+dele.name];
+                    await put('gitPathData?', gpd);
                 }
                 window.chooseFile = async function(e, path) {
                     if (!e&&!path) return;

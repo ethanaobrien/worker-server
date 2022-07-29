@@ -1,3 +1,4 @@
+
 <html>
     <head>
         <title>Worker Server Git Manager</title>
@@ -26,6 +27,8 @@
             <br><br>
             Repository URL: <input type="text" id="repositoryURL">
             <br><br>
+            Folder Name: <input type="text" id="folderName">
+            <br><br>
             <button id="next">Next</button>
         </div>
         <div id="branches" style="display:none;"></div>
@@ -35,6 +38,7 @@
             <br><br>
             <button id="next2">Push</button>
         </div>
+        <div id="fileChanges" style="display:none;"></div>
         <div id="updateSettings" style="display:none;">
             <br><br>
             Auth Token: <input type="text" id="authToken">
@@ -53,7 +57,11 @@
             function isChecked() {
                 return false;
             }
-
+            document.getElementById('repositoryURL').addEventListener('change', function() {
+                var parts = document.getElementById('repositoryURL').value.split('://').pop().split('/');
+                if (parts[2]) document.getElementById('folderName').value = parts[2];
+            })
+            
             async function submitPressed(files, zip, deleteExisting, baseFolder) {
                 await processFiles(files, files[0].webkitRelativePath.split('/')[0], baseFolder);
             }
@@ -97,30 +105,94 @@
                 }
                 return window.btoa(binary);
             }
-            async function push(url, auth, branch, name, email, commitMessage) {
+            async function push(url, auth, branch, name, email, commitMessage, folderName) {
                 const msg = document.getElementById('message');
-                msg.innerHTML = 'Pushing Changes';
+                var fileChanges = document.getElementById('fileChanges');
                 var parts = url.split('://').pop().split('/');
                 var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches/'+branch;
+                var lastCommitSha = await getLastCommitSha(parts[1]+'-'+parts[2]);
+                var last_commit_sha = JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true))).commit.sha;
+                console.log(last_commit_sha);
+                console.log(lastCommitSha);
+                if (lastCommitSha !== last_commit_sha) {
+                    error.innerHTML = "Not up to date! Please pull changes.";
+                    return;
+                }
+                msg.innerHTML = 'Pushing Changes';
                 var headers = {
                     "Accept": "application/vnd.github+json",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "Authorization": "token "+auth
                 };
-                headers['Authorization'] = "token "+auth;
-                var last_commit_sha = JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true))).commit.sha;
-                console.log(last_commit_sha)
                 var tree = (await get('fileTree?'))[0].children;
                 var gitBase = function(name) {
                     for (var i=0; i<tree.length; i++) {
                         if (tree[i].name === name) return tree[i];
                     }
-                }(parts[2]);
+                }(folderName);
+                var paths = [];
+                function p(a) {
+                    for (var i=0; i<a.length; i++) {
+                        if (a[i].isDirectory) {
+                            p(a[i].children);
+                        } else {
+                            paths.push(a[i].path);
+                        }
+                    }
+                }
+                p(gitBase.children);
+                //console.log(paths)
+                var {results, oldPaths} = await checkPathsInRepo(paths, parts[1]+'-'+parts[2]);
+                var toDelete = [];
+                //console.log(results)
+                if (results.length > 0) {
+                    await new Promise(function(resolve, reject) {
+                        var html = '';
+                        msg.innerHTML = 'Please confirm created/deleted files';
+                        for (var i=0; i<results.length; i++) {
+                            var id = results[i].path;
+                            html += '<input type="checkbox" id="'+id+'" name="'+id+'" value="'+id+'"><label for="'+id+'"> '+id.split('/').pop()+' ('+results[i].state+')</label><br>';
+                        }
+                        html += '<br><button>Submit</button>';
+                        fileChanges.style = '';
+                        fileChanges.innerHTML = html;
+                        fileChanges.getElementsByTagName('button')[0].addEventListener('click', function() {
+                            for (var i=0; i<results.length; i++) {
+                        		if (document.getElementById(results[i].path).checked) {
+                                    if (results[i].state === 'Created') {
+                                        if (!oldPaths.includes(results[i].path)) oldPaths.push(results[i].path);
+                                    } else {
+                                        var index = oldPaths.indexOf(results[i].path);
+                                        if (index !== -1) {
+                                            oldPaths.splice(index, 1);
+                                        }
+                                        toDelete.push(results[i].path);
+                                    }
+                                }
+                            }
+                            //console.log(toDelete, oldPaths);
+                            fileChanges.style = 'display:none;';
+                            resolve();
+                        })
+                    })
+                }
+                msg.innerHTML = 'Pushing Changes';
+                error.innerHTML = '';
                 var dataToPush = [];
+                for (var i=0; i<toDelete.length; i++) {
+                    dataToPush.push({
+                        "path": toDelete[i].replace(gitBase.path, ''),
+                        "mode": "100644",
+                        "type": "blob",
+                        "sha": null
+                    });
+                }
                 async function process(data, startReplace) {
                     for (var i=0; i<data.length; i++) {
                         if (data[i].isDirectory) {
                             await process(data[i].children, startReplace);
                         } else {
+                            if (!oldPaths.includes(data[i].path)) continue;
                             dataToPush.push({
                                 "path": data[i].path.replace(startReplace, ''),
                                 "mode": "100644",
@@ -131,6 +203,7 @@
                     }
                 }
                 await process(gitBase.children, gitBase.path);
+                //console.log(dataToPush)
                 var tree_sha = JSON.parse(new TextDecoder().decode(await fetchZip('https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/trees', headers, false, true, "POST", JSON.stringify({
                     "base_tree": last_commit_sha,
                     "tree": dataToPush
@@ -151,10 +224,39 @@
                     "ref": "refs/heads/"+branch,
                     "sha": new_commit_sha
                 })))).object.sha;
+                await updatePathsInRepo(oldPaths, parts[1]+'-'+parts[2], new_commit_sha);
                 console.log(new_commit_sha);
                 msg.innerHTML = '<a href="https://github.com/'+parts[1]+'/'+parts[2]+'/commit/'+new_commit_sha+'" target="_blank">View Diff</a>';
             }
-            async function clone(url, auth, branch) {
+            async function updatePathsInRepo(paths, key, sha) {
+                var cp = await get("gitPathData?");
+                if (!cp) cp={};
+                if (!cp[key]) cp[key] = {};
+                if (paths) cp[key].paths = paths;
+                if (sha) cp[key].sha = sha;
+                await put("gitPathData?", cp);
+            }
+            async function getLastCommitSha(key) {
+                var cp = await get("gitPathData?");
+                if (!cp) cp={};
+                return cp[key].sha;
+            }
+            async function checkPathsInRepo(newPaths, key) {
+                var cp = await get("gitPathData?");
+                if (!cp) cp={};
+                var oldPaths = cp[key].paths;
+                var results = [];
+                for (var i=0; i<newPaths.length; i++) {
+                    if (oldPaths.includes(newPaths[i])) continue;
+                    results.push({state:"Created", path:newPaths[i]});
+                }
+                for (var i=0; i<oldPaths.length; i++) {
+                    if (newPaths.includes(oldPaths[i])) continue;
+                    results.push({state:"Deleted", path:oldPaths[i]});
+                }
+                return {results, oldPaths};
+            }
+            async function clone(url, auth, branch, folderName) {
                 const msg = document.getElementById('message');
                 var parts = url.split('://').pop().split('/');
                 var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/trees/'+branch;
@@ -163,6 +265,7 @@
                     "Authorization":  "token "+auth
                 };
                 var paths = [];
+                var p2 = [];
                 async function downloadAndStore(file, cp) {
                     var c = await fetchZip(file, headers, false, true);
                     var a = JSON.parse(new TextDecoder().decode(c)).tree;
@@ -171,8 +274,9 @@
                             try {
                                 var ct1 = JSON.parse(new TextDecoder().decode(await fetchZip(a[i].url, headers, false, (true))));
                                 var contents = await str2ab(ct1.content);
+                                p2.push(('/'+folderName+cp+'/'+a[i].path).split('//').join('/'));
                                 paths.push({
-                                    webkitRelativePath: ('/'+parts[2]+cp+'/'+a[i].path).split('//').join('/'),
+                                    webkitRelativePath: ('/'+folderName+cp+'/'+a[i].path).split('//').join('/'),
                                     data: contents
                                 });
                             } catch(e) {
@@ -186,6 +290,8 @@
                 msg.innerHTML = "Downloading...";
                 try {
                     await downloadAndStore(downloadLink, '/');
+                    var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches/'+branch;
+                	await updatePathsInRepo(p2, parts[1]+'-'+parts[2], JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true))).commit.sha);
                 } catch(e) {
                     if (!e.message) {
                         msg.innerHTML = "Error";
@@ -249,7 +355,7 @@
                 if (!git) git=[];
                 var includes = false;
                 for (var i=0; i<git.length; i++) {
-                    if (git[i].name === name.name) {
+                    if (git[i].name === name.name && git[i].owner === name.owner) {
                         return;
                     }
                 }
@@ -260,17 +366,35 @@
                 window.processing = true;
                 var opts = {
                     auth: document.getElementById('authToken').value,
-                    url: document.getElementById('repositoryURL').value
+                    url: document.getElementById('repositoryURL').value,
+                    folderName: document.getElementById('folderName').value
                 }
-                if (!opts.auth||!opts.url) return;
+                if (!opts.auth||!opts.url||!opts.folderName) {
+                	error.innerText = 'Missing one or more values!';
+                    return;
+                }
+                if (opts.url.split('://').pop().split('/')[0].toLowerCase() !== 'github.com') {
+                	error.innerText = 'Only GitHub.com is supported!';
+                    return;
+                }
+                document.getElementById('cloneOpts').style = 'display:none;';
+                error.innerText = '';
                 var headers = {
                     "Accept":"application/vnd.github+json",
                     "Authorization":  "token "+opts.auth
                 };
                 var parts = opts.url.split('://').pop().split('/');
+                opts.url = 'https://github.com/'+parts[1]+'/'+parts[2]+'/';
                 var branchez = document.getElementById('branches');
                 var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches';
                 var branches = JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true)));
+                if (branches.length === 1) {
+                    await clone(opts.url, opts.auth, branches[0].name, opts.folderName);
+                    await addToGit({owner:parts[1],name:parts[2], folderName:opts.folderName,branch:branches[0].name,url:opts.url});
+                    window.processing = false;
+                    window.location.reload();
+                    return;
+                }
                 document.getElementById('cloneOpts').style = 'display:none;';
                 branchez.innerHTML = 'Which branch do you want to clone?<br><br>';
                 for (var i=0; i<branches.length; i++) {
@@ -293,8 +417,8 @@
                         return;
                     }
                     error.innerText = '';
-                    await clone(opts.url, opts.auth, q);
-                    await addToGit({name:parts[2],branch:q,url:opts.url});
+                    await clone(opts.url, opts.auth, q, opts.folderName);
+                    await addToGit({owner:parts[1],name:parts[2],branch:q,url:opts.url,folderName:opts.folderName});
                     window.processing = false;
                     window.location.reload();
                 })
@@ -323,7 +447,7 @@
                     };
                 };
                 if (!q) {
-                	error.innerText = 'Branch not selected!';
+                	error.innerText = 'Repository not selected!';
                     return;
                 }
                 error.innerText = '';
@@ -335,12 +459,12 @@
                         name: document.getElementById('name').value,
                         email: document.getElementById('email').value
                     };
-                    var url = await async function() {
+                    var {url,folderName,branch} = await async function() {
                         var git = await get('gitData?');
                         if (!git) git=[];
                         for (var i=0; i<git.length; i++) {
-                            if (git[i].name === q) {
-                                return git[i].url;
+                            if (git[i].name+'-'+git[i].owner === q) {
+                                return git[i];
                             }
                         }
                     }();
@@ -348,17 +472,8 @@
                         if (!opts[k]) return;
                     }
                     var parts = url.split('://').pop().split('/');
-                    var branch = await async function() {
-                        var git = await get('gitData?');
-                        if (!git) git=[];
-                        for (var i=0; i<git.length; i++) {
-                            if (git[i].name === parts[2]) {
-                                return git[i].branch;
-                            }
-                        }
-                    }();
                     document.getElementById('pushOpts').style = 'display:none;';
-                    await push(url, opts.auth, branch, opts.name, opts.email, opts.commitMsg);
+                    await push(url, opts.auth, branch, opts.name, opts.email, opts.commitMsg, folderName);
                     window.processing = false;
                 })
                 document.getElementById('main').style = 'display:none;';
@@ -374,32 +489,41 @@
                     };
                 };
                 if (!q) {
-                	error.innerText = 'Branch not selected!';
+                	error.innerText = 'Repository not selected!';
                     return;
                 }
                 error.innerText = '';
-                var paths = await get('paths?');
-                var git = await get('gitData?');
-                if (!paths) paths = [];
-                if (!git) git = [];
-                var newPaths = [];
-                for (var i=0; i<paths.length; i++) {
-                    if (paths[i]&&paths[i].startsWith('/'+q+'/')) {
-                        await deleteF(paths[i]);
-                    } else {
-                        newPaths.push(paths[i]);
+                var {folderName} = await async function() {
+                    var git = await get('gitData?');
+                    if (!git) git=[];
+                    for (var i=0; i<git.length; i++) {
+                        if (git[i].name+'-'+git[i].owner === q) {
+                            return git[i];
+                        }
                     }
-                }
-                await put('fileTree?', getFileTree(newPaths));
-                await put('paths?', newPaths);
+                }();
+                await updateTree('/'+folderName+'/', true, true);
+                var git = await get('gitData?');
+                if (!git) git = [];
                 var newGit = [];
-                console.log(git, q)
+                var dele;
+                //console.log(git, q)
                 for (var i=0; i<git.length; i++) {
-                    if (git[i].name !== q) newGit.push(git[i]);
+                    if (git[i].name+'-'+git[i].owner !== q) newGit.push(git[i]);
+                    else dele=git[i];
                 }
                 await put('gitData?', newGit);
+                var gpd = await get('gitPathData?');
+                if (gpd[dele.owner+'/'+dele.name]) delete gpd[dele.owner+'/'+dele.name];
+                await put('gitPathData?', gpd);
             }
-            document.getElementById('delete').addEventListener('click', del);
+            document.getElementById('delete').addEventListener('click', async function() {
+                if (!window.confirm("All changes will be deleted. Continue?")) return;
+                document.getElementById('main').style = 'display:none;';
+                document.getElementById('message').innerHTML = 'Please Wait...';
+                await del();
+                window.location.reload();
+            });
             document.getElementById('update').addEventListener('click', async function() {
                 var q;
                 var radios = document.getElementsByName('branchSelected');
@@ -410,7 +534,7 @@
                     };
                 };
                 if (!q) {
-                	error.innerText = 'Branch not selected!';
+                	error.innerText = 'Repository not selected!';
                     return;
                 }
                 error.innerText = '';
@@ -422,7 +546,7 @@
                 var git = await get('gitData?');
                 var opts;
                 for (var i=0; i<git.length; i++) {
-                    if (git[i].name === q) {
+                    if (git[i].name+'-'+git[i].owner === q) {
                         opts = git[i];
                         break;
                     }
@@ -466,11 +590,10 @@
                 var list = document.getElementById('list');
                 var git = await get('gitData?');
                 if (!git) {
-                    await put('gitData?', []);
                     git = [];
                 }
                 for (var i=0; i<git.length; i++) {
-                    list.innerHTML += '<input type="radio" id="'+git[i].name+'" value="'+git[i].name+'" name="branchSelected"><label for="'+git[i].name+'"><a href="'+git[i].url+'" target="_blank">'+git[i].name+'</a></label><br>';
+                    list.innerHTML += '<input type="radio" id="'+git[i].name+'-'+git[i].owner+'" value="'+git[i].name+'-'+git[i].owner+'" name="branchSelected"><label for="'+git[i].name+'-'+git[i].owner+'"><a href="'+git[i].url+'" target="_blank">'+git[i].owner+'/'+git[i].name+'</a></label><br>';
                 }
                 var ne = await get('gitConfig?');
                 if (!ne) ne={};
