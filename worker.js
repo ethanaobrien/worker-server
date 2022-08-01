@@ -7,7 +7,7 @@ addEventListener('message', function(e) {
 });
 
 addEventListener("fetch", (e) => {
-    if (self.location.hostname !== (new URL(e.request.url)).hostname) return;
+    if (self.location.host !== (new URL(e.request.url)).host) return;
     e.respondWith(handleRequest(e));
 });
 
@@ -28,7 +28,8 @@ addEventListener('install', function(e) {
                 '/codemirror.css?bypass=1',
                 '/codemirror.min.js?bypass=1',
                 '/editor.html?bypass=1',
-                '/favicon.ico?bypass=1'
+                '/favicon.ico?bypass=1',
+                '/git.html?bypass=1'
             ]);
         })()
     );

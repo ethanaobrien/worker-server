@@ -1,4 +1,3 @@
-
 <html>
     <head>
         <title>Worker Server Git Manager</title>
@@ -40,8 +39,9 @@
         </div>
         <div id="fileChanges" style="display:none;"></div>
         <div id="updateSettings" style="display:none;">
-            <br><br>
-            Auth Token: <input type="text" id="authToken">
+            <br>
+            <button id="githubSignIn">Sign into GitHub</button>
+            <input style="display:none;" id="authToken">
             <br><br>
             Name: <input type="text" id="name">
             <br><br>
@@ -53,6 +53,8 @@
         </div>
         <p id="error" style="color:red;"></p>
         <script>
+            window.clientId = 'e25d49343bed01c25465';
+            window.loginServer = 'https://worker-server-auth-server.herokuapp.com/';
             const error = document.getElementById('error');
             function isChecked() {
                 return false;
@@ -586,7 +588,48 @@
                     document.getElementById('authToken').value = ne.auth;
                 }
             })
+            document.getElementById('githubSignIn').addEventListener('click', async function() {
+                //https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
+                function generateRandomCode(length) {
+                    var result           = '';
+                    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                    var charactersLength = characters.length;
+                    for ( var i = 0; i < length; i++ ) {
+                      result += characters.charAt(Math.floor(Math.random() * 
+                 charactersLength));
+                   }
+                   return result;
+                }
+                const state = generateRandomCode(15);
+                window.localStorage.setItem('githubAuthState', state);
+                window.location.href = 'https://github.com/login/oauth/authorize?client_id='+window.clientId+'&redirect_uri=https://worker-server.netlify.app/git.html?bypass=1&state='+state;
+            })
+            async function githubCallback(url) {
+                var state = window.localStorage.getItem('githubAuthState');
+                window.localStorage.removeItem('githubAuthState');
+                var urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('code')) {
+                    if (urlParams.get('state') !== state) {
+                        alert('It looks like the authentication state may have been hijacked. Please try again.');
+                        return;
+                    }
+                    try {
+                        var accessCode = JSON.parse(new TextDecoder().decode(await fetchZip(window.loginServer, null, false, true, "POST", urlParams.get('code')))).access_token;
+                        document.getElementById('authToken').value = accessCode;
+                        var opts = {
+                            name: document.getElementById('name').value,
+                            email: document.getElementById('email').value,
+                            auth: accessCode
+                        };
+                        await put('gitConfig?', opts);
+                    } catch(e) {
+                        alert('there was a problem signing into github');
+                    }
+                }
+            }
             window.addEventListener('load', async function() {
+                var urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('code')&&urlParams.get('state')) githubCallback();
                 var list = document.getElementById('list');
                 var git = await get('gitData?');
                 if (!git) {
