@@ -39,9 +39,16 @@
         </div>
         <div id="fileChanges" style="display:none;"></div>
         <div id="updateSettings" style="display:none;">
-            <br>
-            <button id="githubSignIn">Sign into GitHub</button>
-            <input style="display:none;" id="authToken">
+            <div id="githubSignInField">
+                <br>
+                <button id="githubSignIn">Sign into GitHub</button>
+            </div>
+            <div id="signedIntoGithub" style="display:none;">
+                <br><p>You're already signed into github.</p><br>
+                <button id="signInAgain">Sign in again</button>
+            </div>
+            <br><br>
+            Or use your own access token: <input id="authToken">
             <br><br>
             Name: <input type="text" id="name">
             <br><br>
@@ -63,7 +70,7 @@
                 var parts = document.getElementById('repositoryURL').value.split('://').pop().split('/');
                 if (parts[2]) document.getElementById('folderName').value = parts[2];
             })
-            
+
             async function submitPressed(files, zip, deleteExisting, baseFolder) {
                 await processFiles(files, files[0].webkitRelativePath.split('/')[0], baseFolder);
             }
@@ -160,7 +167,7 @@
                         fileChanges.innerHTML = html;
                         fileChanges.getElementsByTagName('button')[0].addEventListener('click', function() {
                             for (var i=0; i<results.length; i++) {
-                        		if (document.getElementById(results[i].path).checked) {
+                                if (document.getElementById(results[i].path).checked) {
                                     if (results[i].state === 'Created') {
                                         if (!oldPaths.includes(results[i].path)) oldPaths.push(results[i].path);
                                     } else {
@@ -290,26 +297,11 @@
                     }
                 }
                 msg.innerHTML = "Downloading...";
-                try {
-                    await downloadAndStore(downloadLink, '/');
-                    var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches/'+branch;
-                	await updatePathsInRepo(p2, parts[1]+'-'+parts[2], JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true))).commit.sha);
-                } catch(e) {
-                    if (!e.message) {
-                        msg.innerHTML = "Error";
-                    } else {
-                        msg.innerHTML = e.message;
-                    }
-                    console.warn(e);
-                    return;
-                }
+                await downloadAndStore(downloadLink, '/');
+                var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches/'+branch;
+                await updatePathsInRepo(p2, parts[1]+'-'+parts[2], JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true))).commit.sha);
                 msg.innerHTML = "Done Downloading";
-                try {
-                    await submitPressed(paths, null, isChecked('deleteExisting'), isChecked('baseFolder'));
-                } catch(e) {
-                    console.warn(e);
-                    return;
-                }
+                await submitPressed(paths, null, isChecked('deleteExisting'), isChecked('baseFolder'));
                 msg.innerHTML = "";
             }
             function fetchZip(zip, adhs, disp, check4UnAuth, method, data) {
@@ -367,16 +359,16 @@
             document.getElementById('next').addEventListener('click', async function() {
                 window.processing = true;
                 var opts = {
-                    auth: document.getElementById('authToken').value,
+                    auth: await getAuth(),
                     url: document.getElementById('repositoryURL').value,
                     folderName: document.getElementById('folderName').value
                 }
                 if (!opts.auth||!opts.url||!opts.folderName) {
-                	error.innerText = 'Missing one or more values!';
+                    error.innerText = 'Missing one or more values!';
                     return;
                 }
                 if (opts.url.split('://').pop().split('/')[0].toLowerCase() !== 'github.com') {
-                	error.innerText = 'Only GitHub.com is supported!';
+                    error.innerText = 'Only GitHub.com is supported!';
                     return;
                 }
                 document.getElementById('cloneOpts').style = 'display:none;';
@@ -391,7 +383,20 @@
                 var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches';
                 var branches = JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true)));
                 if (branches.length === 1) {
-                    await clone(opts.url, opts.auth, branches[0].name, opts.folderName);
+                    try {
+                        await clone(opts.url, opts.auth, branches[0].name, opts.folderName);
+                    } catch(e) {
+                        const msg = document.getElementById("message");
+                        console.warn(e);
+                        if (e.body) {
+                            msg.innerHTML = "Error: "+JSON.parse(new TextDecoder().decode(e.body)).message;
+                        } else if (e.message) {
+                            msg.innerHTML = "Error: "+e.message;
+                        } else {
+                            msg.innerHTML = "There was an error";
+                        }
+                        return;
+                    }
                     await addToGit({owner:parts[1],name:parts[2], folderName:opts.folderName,branch:branches[0].name,url:opts.url});
                     window.processing = false;
                     window.location.reload();
@@ -419,14 +424,27 @@
                         return;
                     }
                     error.innerText = '';
-                    await clone(opts.url, opts.auth, q, opts.folderName);
+                    try {
+                        await clone(opts.url, opts.auth, q, opts.folderName);
+                    } catch(e) {
+                        const msg = document.getElementById("message");
+                        console.warn(e);
+                        if (e.body) {
+                            msg.innerHTML = "Error: "+JSON.parse(new TextDecoder().decode(e.body)).message;
+                        } else if (e.message) {
+                            msg.innerHTML = "Error: "+e.message;
+                        } else {
+                            msg.innerHTML = "There was an error";
+                        }
+                        return;
+                    }
                     await addToGit({owner:parts[1],name:parts[2],branch:q,url:opts.url,folderName:opts.folderName});
                     window.processing = false;
                     window.location.reload();
                 })
             });
-            document.getElementById('clone').addEventListener('click', function() {
-                if (!document.getElementById('authToken').value) {
+            document.getElementById('clone').addEventListener('click', async function() {
+                if (!await getAuth()) {
                     error.innerText = 'Please configure git settings first!';
                     return;
                 }
@@ -434,8 +452,8 @@
                 document.getElementById('main').style = 'display:none;';
                 document.getElementById('cloneOpts').style = '';
             })
-            document.getElementById('push').addEventListener('click', function() {
-                if (!document.getElementById('authToken').value||!document.getElementById('name').value||!document.getElementById('email').value) {
+            document.getElementById('push').addEventListener('click', async function() {
+                if (!await getAuth()||!document.getElementById('name').value||!document.getElementById('email').value) {
                     error.innerText = 'Please configure git settings first!';
                     return;
                 }
@@ -449,14 +467,14 @@
                     };
                 };
                 if (!q) {
-                	error.innerText = 'Repository not selected!';
+                    error.innerText = 'Repository not selected!';
                     return;
                 }
                 error.innerText = '';
                 document.getElementById('next2').addEventListener('click', async function() {
                     window.processing = true
                     var opts = {
-                        auth: document.getElementById('authToken').value,
+                        auth: await getAuth(),
                         commitMsg: document.getElementById('commitMsg').value,
                         name: document.getElementById('name').value,
                         email: document.getElementById('email').value
@@ -475,7 +493,20 @@
                     }
                     var parts = url.split('://').pop().split('/');
                     document.getElementById('pushOpts').style = 'display:none;';
-                    await push(url, opts.auth, branch, opts.name, opts.email, opts.commitMsg, folderName);
+                    try {
+                        await push(url, opts.auth, branch, opts.name, opts.email, opts.commitMsg, folderName);
+                    } catch(e) {
+                        const msg = document.getElementById("message");
+                        console.warn(e);
+                        if (e.body) {
+                            msg.innerHTML = "Error: "+JSON.parse(new TextDecoder().decode(e.body)).message;
+                        } else if (e.message) {
+                            msg.innerHTML = "Error: "+e.message;
+                        } else {
+                            msg.innerHTML = "There was an error";
+                        }
+                        return;
+                    }
                     window.processing = false;
                 })
                 document.getElementById('main').style = 'display:none;';
@@ -491,7 +522,7 @@
                     };
                 };
                 if (!q) {
-                	error.innerText = 'Repository not selected!';
+                    error.innerText = 'Repository not selected!';
                     return;
                 }
                 error.innerText = '';
@@ -516,7 +547,7 @@
                 }
                 await put('gitData?', newGit);
                 var gpd = await get('gitPathData?');
-                if (gpd[dele.owner+'/'+dele.name]) delete gpd[dele.owner+'/'+dele.name];
+                if (gpd[dele.owner+'-'+dele.name]) delete gpd[dele.owner+'-'+dele.name];
                 await put('gitPathData?', gpd);
             }
             document.getElementById('delete').addEventListener('click', async function() {
@@ -527,6 +558,7 @@
                 window.location.reload();
             });
             document.getElementById('update').addEventListener('click', async function() {
+                const msg = document.getElementById('message');
                 var q;
                 var radios = document.getElementsByName('branchSelected');
                 for (var i=0; i<radios.length; i++) {
@@ -536,14 +568,14 @@
                     };
                 };
                 if (!q) {
-                	error.innerText = 'Repository not selected!';
+                    error.innerText = 'Repository not selected!';
                     return;
                 }
                 error.innerText = '';
                 if (!window.confirm("All changes will be deleted. Continue?")) return;
                 document.getElementById('main').style = 'display:none;';
                 document.getElementById('message').innerHTML = 'Please Wait...';
-                var auth = document.getElementById('authToken').value;
+                var auth = await getAuth();
                 if (!auth) return;
                 var git = await get('gitData?');
                 var opts;
@@ -553,10 +585,21 @@
                         break;
                     }
                 }
-                await del();
-                await clone(opts.url, auth, opts.branch);
-                await addToGit(opts);
-                document.getElementById('main').style = '';
+                try {
+                    await del();
+                    await clone(opts.url, auth, opts.branch, opts.folderName);
+                    await addToGit(opts);
+                    document.getElementById('main').style = '';
+                } catch(e) {
+                    console.warn(e);
+                    if (e.body) {
+                        msg.innerHTML = "Error: "+JSON.parse(new TextDecoder().decode(e.body)).message;
+                    } else if (e.message) {
+                        msg.innerHTML = "Error: "+e.message;
+                    } else {
+                        msg.innerHTML = "There was an error";
+                    }
+                }
             });
             document.getElementById('settings').addEventListener('click', function() {
                 error.innerText = '';
@@ -568,9 +611,13 @@
                 document.getElementById('updateSettings').style = 'display:none;';
                 var opts = {
                     name: document.getElementById('name').value,
-                    email: document.getElementById('email').value,
-                    auth: document.getElementById('authToken').value
+                    email: document.getElementById('email').value
                 };
+                if (document.getElementById('authToken').value) {
+                    document.getElementById('signedIntoGithub').style = 'display:none;';
+                    document.getElementById('githubSignInField').style = '';
+                    saveAuth(document.getElementById('authToken').value, false);
+                }
                 await put('gitConfig?', opts);
             })
             document.getElementById('cancelSettings').addEventListener('click', async function() {
@@ -584,8 +631,8 @@
                 if (ne.email) {
                     document.getElementById('email').value = ne.email;
                 }
-                if (ne.auth) {
-                    document.getElementById('authToken').value = ne.auth;
+                if (await getAuth(true)) {
+                    document.getElementById('authToken').value = await getAuth(true);
                 }
             })
             document.getElementById('githubSignIn').addEventListener('click', async function() {
@@ -595,41 +642,73 @@
                     var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
                     var charactersLength = characters.length;
                     for ( var i = 0; i < length; i++ ) {
-                      result += characters.charAt(Math.floor(Math.random() * 
-                 charactersLength));
-                   }
-                   return result;
+                        result += characters.charAt(Math.floor(Math.random() * 
+                                                               charactersLength));
+                    }
+                    return result;
                 }
                 const state = generateRandomCode(15);
                 window.localStorage.setItem('githubAuthState', state);
                 window.location.href = 'https://github.com/login/oauth/authorize?client_id='+window.clientId+'&redirect_uri=https://worker-server.netlify.app/git.html?bypass=1&state='+state;
             })
             async function githubCallback(url) {
+                document.getElementById('main').style = 'display:none;';
+                const msg = document.getElementById('message');
                 var state = window.localStorage.getItem('githubAuthState');
                 window.localStorage.removeItem('githubAuthState');
                 var urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.get('code')) {
                     if (urlParams.get('state') !== state) {
-                        alert('It looks like the authentication state may have been hijacked. Please try again.');
+                        alert('It looks like the authentication may have been hijacked. Please try again.');
+                        window.location.href = window.location.href.split('?')[0]+'?bypass=1';
                         return;
                     }
                     try {
+                        msg.innerHTML = 'Signing you in...';
                         var accessCode = JSON.parse(new TextDecoder().decode(await fetchZip(window.loginServer, null, false, true, "POST", urlParams.get('code')))).access_token;
-                        document.getElementById('authToken').value = accessCode;
-                        var opts = {
-                            name: document.getElementById('name').value,
-                            email: document.getElementById('email').value,
-                            auth: accessCode
-                        };
-                        await put('gitConfig?', opts);
+                        await saveAuth(accessCode, true);
+                        window.location.href = window.location.href.split('?')[0]+'?bypass=1';
                     } catch(e) {
                         alert('there was a problem signing into github');
+                        window.location.href = window.location.href.split('?')[0]+'?bypass=1';
                     }
                 }
             }
+            async function saveAuth(auth, github) {
+                if (!auth) return;
+                await put('gitAuth?', {
+                    key: auth,
+                    github
+                });
+            }
+            async function getAuth(notGithub) {
+                var auth = await get('gitAuth?');
+                if (!auth) return '';
+                if (notGithub) {
+                    if (auth.github) return '';
+                    else return auth.key;
+                }
+                return auth.key;
+            }
+            async function checkAuth() {
+                var auth = await get('gitAuth?');
+                if (!auth) return;
+                console.log(auth);
+                if (auth.github) {
+                    document.getElementById('signedIntoGithub').style = '';
+                    document.getElementById('githubSignInField').style = 'display:none;';
+                }
+            }
+            document.getElementById('signInAgain').addEventListener('click', function() {
+                document.getElementById('signedIntoGithub').style = 'display:none;';
+                document.getElementById('githubSignInField').style = '';
+            })
             window.addEventListener('load', async function() {
                 var urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('code')&&urlParams.get('state')) githubCallback();
+                if (urlParams.get('code') && urlParams.get('state')) {
+                    githubCallback();
+                    return;
+                }
                 var list = document.getElementById('list');
                 var git = await get('gitData?');
                 if (!git) {
@@ -646,9 +725,10 @@
                 if (ne.email) {
                     document.getElementById('email').value = ne.email;
                 }
-                if (ne.auth) {
-                    document.getElementById('authToken').value = ne.auth;
+                if (await getAuth(true)) {
+                    document.getElementById('authToken').value = await getAuth(true);
                 }
+                await checkAuth();
             })
             window.addEventListener('beforeunload', function(e) {
                 if (window.processing) {
