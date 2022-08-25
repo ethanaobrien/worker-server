@@ -120,6 +120,11 @@
                 var parts = url.split('://').pop().split('/');
                 var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches/'+branch;
                 var lastCommitSha = await getLastCommitSha(parts[1]+'-'+parts[2]);
+                var headers = {
+                    "Accept": "application/vnd.github+json",
+                    "Content-Type": "application/json",
+                    "Authorization": "token "+auth
+                };
                 var last_commit_sha = JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true))).commit.sha;
                 console.log(last_commit_sha);
                 console.log(lastCommitSha);
@@ -128,11 +133,6 @@
                     return;
                 }
                 msg.innerHTML = 'Pushing Changes';
-                var headers = {
-                    "Accept": "application/vnd.github+json",
-                    "Content-Type": "application/json",
-                    "Authorization": "token "+auth
-                };
                 var tree = (await get('fileTree?'))[0].children;
                 var gitBase = function(name) {
                     for (var i=0; i<tree.length; i++) {
