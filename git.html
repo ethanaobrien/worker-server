@@ -24,16 +24,17 @@
         </div>
         <div id="cloneOpts" style="display:none;">
             <br><br>
-            Repository URL: <input type="text" id="repositoryURL">
+            Repository URL: <input type="text" id="repositoryURL" autocomplete="off">
             <br><br>
-            Folder Name: <input type="text" id="folderName">
+            Folder Name: <input type="text" id="folderName" autocomplete="off">
             <br><br>
             <button id="next">Next</button>
         </div>
         <div id="branches" style="display:none;"></div>
         <div id="pushOpts" style="display:none;">
             <br><br>
-            Commit Message: <input type="text" id="commitMsg">
+            <p>Commit Message:</p>
+            <textarea id="commitMsg" autocomplete="off" style="width:25%;height:25%;"></textarea>
             <br><br>
             <button id="next2">Push</button>
         </div>
@@ -48,11 +49,11 @@
                 <button id="signInAgain">Sign in again</button>
             </div>
             <br><br>
-            Or use your own access token: <input id="authToken">
+            Or use your own access token: <input id="authToken" type="password" autocomplete="off">
             <br><br>
-            Name: <input type="text" id="name">
+            Name: <input type="text" id="name" autocomplete="off">
             <br><br>
-            Email: <input type="text" id="email">
+            Email: <input type="text" id="email" autocomplete="off">
             <br><br>
             <button id="saveSettings">Save</button>
             <br><br>
@@ -115,6 +116,7 @@
                 return window.btoa(binary);
             }
             async function push(url, auth, branch, name, email, commitMessage, folderName) {
+                //todo - ability to see file diff - would make pushing much faster
                 const msg = document.getElementById('message');
                 var fileChanges = document.getElementById('fileChanges');
                 var parts = url.split('://').pop().split('/');
@@ -381,7 +383,20 @@
                 opts.url = 'https://github.com/'+parts[1]+'/'+parts[2]+'/';
                 var branchez = document.getElementById('branches');
                 var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches';
-                var branches = JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true)));
+                try {
+                	var branches = JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true)));
+                } catch(e) {
+                    const msg = document.getElementById("message");
+                    console.warn(e);
+                    if (e.body) {
+                        msg.innerHTML = "Error: "+JSON.parse(new TextDecoder().decode(e.body)).message;
+                    } else if (e.message) {
+                        msg.innerHTML = "Error: "+e.message;
+                    } else {
+                        msg.innerHTML = "There was an error";
+                    }
+                    return;
+                }
                 if (branches.length === 1) {
                     try {
                         await clone(opts.url, opts.auth, branches[0].name, opts.folderName);
