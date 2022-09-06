@@ -104,8 +104,13 @@ async function updateTree(path, remove, folder) {
             }
         }
     }
-    await put('fileTree?', getFileTree(paths));
-    await put('paths?', paths);
+    if (paths.length > 0) {
+        await put('fileTree?', getFileTree(paths));
+        await put('paths?', paths);
+    } else {
+        await deleteF('fileTree?');
+        await deleteF('paths?');
+    }
 }
 function transformArgs(url) {
     var args = {};
