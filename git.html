@@ -169,7 +169,7 @@
                         msg.innerHTML = 'Please confirm modified files';
                         for (var i=0; i<results.length; i++) {
                             var id = results[i].path;
-                            html += '<input type="checkbox" id="'+id+'" name="'+id+'" value="'+id+'"><label for="'+id.replace(gitBase.path, '')+'"> '+id+' ('+results[i].state+')</label><br>';
+                            html += '<input type="checkbox" id="'+id+'" name="'+id+'" value="'+id+'"><label for="'+id+'"> '+id.replace(gitBase.path, '')+' ('+results[i].state+')</label><br>';
                         }
                         html += '<br><button>Submit</button>';
                         fileChanges.style = '';
