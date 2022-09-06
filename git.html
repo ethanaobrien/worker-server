@@ -61,6 +61,11 @@
         </div>
         <p id="error" style="color:red;"></p>
         <script>
+            window.onerror = function(e) {
+                alert(e);
+            }
+        </script>
+        <script>
             window.clientId = 'e25d49343bed01c25465';
             window.loginServer = 'https://worker-server-auth-server.herokuapp.com/';
             const error = document.getElementById('error');
@@ -134,7 +139,6 @@
                     error.innerHTML = "Not up to date! Please pull changes.";
                     return;
                 }
-                msg.innerHTML = 'Pushing Changes';
                 var tree = (await get('fileTree?'))[0].children;
                 var gitBase = function(name) {
                     for (var i=0; i<tree.length; i++) {
@@ -153,39 +157,42 @@
                 }
                 p(gitBase.children);
                 //console.log(paths)
-                var {results, oldPaths} = await checkPathsInRepo(paths, parts[1]+'-'+parts[2]);
-                var toDelete = [];
+                msg.innerHTML = 'Checking for changes';
+                const {results, oldPaths} = await checkPathsInRepo(paths, parts[1]+'-'+parts[2]);
+                let toDelete = [];
+                let toPush = [];
+                
                 //console.log(results)
                 if (results.length > 0) {
                     await new Promise(function(resolve, reject) {
                         var html = '';
-                        msg.innerHTML = 'Please confirm created/deleted files';
+                        msg.innerHTML = 'Please confirm modified files';
                         for (var i=0; i<results.length; i++) {
                             var id = results[i].path;
-                            html += '<input type="checkbox" id="'+id+'" name="'+id+'" value="'+id+'"><label for="'+id+'"> '+id.split('/').pop()+' ('+results[i].state+')</label><br>';
+                            html += '<input type="checkbox" id="'+id+'" name="'+id+'" value="'+id+'"><label for="'+id.replace(gitBase.path, '')+'"> '+id+' ('+results[i].state+')</label><br>';
                         }
                         html += '<br><button>Submit</button>';
                         fileChanges.style = '';
                         fileChanges.innerHTML = html;
                         fileChanges.getElementsByTagName('button')[0].addEventListener('click', function() {
-                            for (var i=0; i<results.length; i++) {
+                            for (let i=0; i<results.length; i++) {
                                 if (document.getElementById(results[i].path).checked) {
-                                    if (results[i].state === 'Created') {
-                                        if (!oldPaths.includes(results[i].path)) oldPaths.push(results[i].path);
-                                    } else {
-                                        var index = oldPaths.indexOf(results[i].path);
-                                        if (index !== -1) {
-                                            oldPaths.splice(index, 1);
-                                        }
+                                    if (results[i].state === 'Deleted') {
                                         toDelete.push(results[i].path);
+                                    } else { //Created or Modified
+                                        toPush.push(results[i].path);
                                     }
                                 }
                             }
-                            //console.log(toDelete, oldPaths);
+                            //console.log(toDelete, toPush);
                             fileChanges.style = 'display:none;';
                             resolve();
                         })
                     })
+                }
+                if (toPush.length === 0) {
+                    msg.innerHTML = 'No Changes to push!';
+                    return;
                 }
                 msg.innerHTML = 'Pushing Changes';
                 error.innerHTML = '';
@@ -198,14 +205,21 @@
                         "sha": null
                     });
                 }
-                async function process(data, startReplace) {
+                let progress = 0;
+                function updateProgress(increase) {
+                    if (!increase) progress++
+                    msg.innerHTML = 'Pushing Changes '+progress+'/'+toPush.length;
+                }
+                updateProgress(true);
+                async function process(data) {
                     for (var i=0; i<data.length; i++) {
                         if (data[i].isDirectory) {
-                            await process(data[i].children, startReplace);
+                            await process(data[i].children);
                         } else {
-                            if (!oldPaths.includes(data[i].path)) continue;
+                            if (!toPush.includes(data[i].path)) continue;
+                            updateProgress();
                             dataToPush.push({
-                                "path": data[i].path.replace(startReplace, ''),
+                                "path": data[i].path.replace(gitBase.path, ''),
                                 "mode": "100644",
                                 "type": "blob",
                                 "sha": JSON.parse(new TextDecoder().decode(await fetchZip('https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/git/blobs', headers, false, true, "POST", JSON.stringify({"encoding": "base64", "content":_arrayBufferToBase64((await get(data[i].path)).data)})))).sha
@@ -239,12 +253,25 @@
                 console.log(new_commit_sha);
                 msg.innerHTML = '<a href="https://github.com/'+parts[1]+'/'+parts[2]+'/commit/'+new_commit_sha+'" target="_blank">View Diff</a>';
             }
+            async function sha256(data) {
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));        
+                const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                return hashHex;
+            }
             async function updatePathsInRepo(paths, key, sha) {
                 var cp = await get("gitPathData?");
                 if (!cp) cp={};
                 if (!cp[key]) cp[key] = {};
                 if (paths) cp[key].paths = paths;
                 if (sha) cp[key].sha = sha;
+                let shas = {};
+                for (let i=0; i<paths.length; i++) {
+                    const file = await get(paths[i]);
+                    if (!file) continue;
+                    shas[paths[i]] = await sha256(file.data);
+                }
+                cp[key].shas = shas;
                 await put("gitPathData?", cp);
             }
             async function getLastCommitSha(key) {
@@ -253,17 +280,27 @@
                 return cp[key].sha;
             }
             async function checkPathsInRepo(newPaths, key) {
-                var cp = await get("gitPathData?");
+                let cp = await get("gitPathData?");
                 if (!cp) cp={};
-                var oldPaths = cp[key].paths;
-                var results = [];
-                for (var i=0; i<newPaths.length; i++) {
+                let oldPaths = cp[key].paths;
+                let fileShas = cp[key].shas;
+                let results = [];
+                for (let i=0; i<newPaths.length; i++) {
                     if (oldPaths.includes(newPaths[i])) continue;
                     results.push({state:"Created", path:newPaths[i]});
                 }
-                for (var i=0; i<oldPaths.length; i++) {
+                for (let i=0; i<oldPaths.length; i++) {
                     if (newPaths.includes(oldPaths[i])) continue;
                     results.push({state:"Deleted", path:oldPaths[i]});
+                }
+                for (let i=0; i<oldPaths.length; i++) {
+                    const sha = fileShas[oldPaths[i]];
+                    if (!sha) continue;
+                    const file = await get(oldPaths[i]);
+                    if (!file) continue;
+                    if (sha !== await sha256(file.data)) {
+                    	results.push({state:"Modified", path:oldPaths[i]});
+                    }
                 }
                 return {results, oldPaths};
             }
@@ -277,10 +314,19 @@
                 };
                 var paths = [];
                 var p2 = [];
+                let progress = 0;
+                let totalProgress = 0;
+                function updateProgress(increase) {
+                    if (!increase) progress++
+                    msg.innerHTML = 'Downloading '+progress+'/'+totalProgress;
+                }
+                updateProgress(true);
                 async function downloadAndStore(file, cp) {
                     var c = await fetchZip(file, headers, false, true);
                     var a = JSON.parse(new TextDecoder().decode(c)).tree;
+                    totalProgress += a.length;
                     for (var i=0; i<a.length; i++) {
+                        updateProgress();
                         if (a[i].type === 'blob') {
                             try {
                                 var ct1 = JSON.parse(new TextDecoder().decode(await fetchZip(a[i].url, headers, false, (true))));
@@ -301,9 +347,9 @@
                 msg.innerHTML = "Downloading...";
                 await downloadAndStore(downloadLink, '/');
                 var downloadLink = 'https://api.github.com/repos/'+parts[1]+'/'+parts[2]+'/branches/'+branch;
-                await updatePathsInRepo(p2, parts[1]+'-'+parts[2], JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true))).commit.sha);
                 msg.innerHTML = "Done Downloading";
                 await submitPressed(paths, null, isChecked('deleteExisting'), isChecked('baseFolder'));
+                await updatePathsInRepo(p2, parts[1]+'-'+parts[2], JSON.parse(new TextDecoder().decode(await fetchZip(downloadLink, headers, false, true))).commit.sha);
                 msg.innerHTML = "";
             }
             function fetchZip(zip, adhs, disp, check4UnAuth, method, data) {
@@ -724,6 +770,13 @@
                     githubCallback();
                     return;
                 }
+                try {
+                    await crypto.subtle.digest('SHA-256', new TextEncoder().encode('test'));
+                } catch(e) {
+                    alert('Looks like crypto is either missing from your browser or you are serving from an http page. Please use https or localhost');
+                    document.getElementById('main').style = 'display:none;';
+                    return;
+                }
                 var list = document.getElementById('list');
                 var git = await get('gitData?');
                 if (!git) {
@@ -754,4 +807,3 @@
         </script>
     </body>
 </html>
-

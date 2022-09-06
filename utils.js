@@ -97,7 +97,7 @@ async function updateTree(path, remove, folder) {
         	paths.splice(index, 1);
         }
         for (var i=0; i<paths.length; i++) {
-            if (paths[i].startsWith(path) && !paths[i].split(path).pop().includes('/')) {
+            if (paths[i].startsWith(path) && !paths[i].substring(path.length).includes(path) && paths[i] !== '/') {
                 await deleteF(paths[i]);
                 paths.splice(i, 1);
                 i--;
@@ -156,6 +156,11 @@ function getFileTree(paths) {
     }
     var result = [];
     var level = {result};
+    for (let i=0; i<paths.length; i++) {
+        if (!paths[i].startsWith('/')) {
+            paths[i] = '/'+paths[i];
+        }
+    }
     paths.forEach(path => {
         path.split('/').reduce((r, name, i, a) => {
             if(!r[name]) {

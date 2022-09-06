@@ -8,7 +8,7 @@
         <link rel="icon" type="image/x-icon" href="/favicon.ico?bypass=1">
         <style>
             body {
-                background-color: #EBFF52;
+                background-color: #a9f4fc;
                 margin: 0px;
             }
             .koolButton {
@@ -218,14 +218,14 @@
                     }
                 })
                 document.getElementById('newFile').addEventListener('click', function(e) {
-                    var name = prompt('enter file name');
+                    var name = prompt('Enter file name.');
                     if (!name) return;
-                    chooseFile(null, decodeURIComponent(name).replaceAll('/', ''));
+                    chooseFile(null, decodeURIComponent(name).replace(/[#<$+%>!`&*'|{}/\\?"=@:^\r\n]/ig, ''));
                 })
                 document.getElementById('newFolder').addEventListener('click', async function(e) {
-                    var name = prompt('enter folder name');
+                    var name = prompt('Enter folder name.');
                     if (!name) return;
-                    await updateTree('/'+decodeURIComponent(name).replaceAll('/', '')+'/');
+                    await updateTree('/'+decodeURIComponent(name).replace(/[#<$+%>!`&*'|{}/\\?"=@:^\r\n]/ig, '')+'/');
                     await loadTree();
                 })
                 function closeFile(path) {
@@ -278,14 +278,14 @@
                     }
                 })
                 window.newFile = function(basePath) {
-                    var name = prompt('enter file name');
+                    var name = prompt('Enter file name.');
                     if (!name) return;
-                    chooseFile(null, basePath+(decodeURIComponent(name).replaceAll('/', '')));
+                    chooseFile(null, basePath+(decodeURIComponent(name).replace(/[#<$+%>!`&*'|{}/\\?"=@:^\r\n]/ig, '')));
                 }
                 window.newFolder = async function(basePath) {
-                    var name = prompt('enter folder name');
+                    var name = prompt('Enter folder name.');
                     if (!name) return;
-                    await updateTree(basePath+(decodeURIComponent(name).replaceAll('/', ''))+'/');
+                    await updateTree(basePath+(decodeURIComponent(name).replace(/[#<$+%>!`&*'|{}/\\?"=@:^\r\n]/ig, ''))+'/');
                     await loadTree();
                 }
                 async function loadTree() {
@@ -315,9 +315,9 @@
                             if (a.isDirectory && b.isDirectory) {
                                 return anl.localeCompare(bnl)
                             } else if (a.isDirectory) {
-                                return -1
+                                return -1;
                             } else if (b.isDirectory) {
-                                return 1
+                                return 1;
                             } else {
                                 return anl.localeCompare(bnl)
                             }
