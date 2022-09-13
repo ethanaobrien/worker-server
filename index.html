@@ -54,7 +54,11 @@
             (async function() {
                 const msg = document.getElementById('message');
                 if (!("serviceWorker" in navigator)) {
-                    document.getElementById('main').innerHTML = '<p>Service workers not avaliable (are you on an https page?)</p>';
+                    document.getElementById('main').innerHTML = '<p>Service workers not available (are you on an https page?)</p>';
+                    return;
+                }
+                if (!window.indexedDB) {
+                    document.getElementById('main').innerHTML = '<p>IndexedDB not available. What browser are you using? Chrome 5?</p>';
                     return;
                 }
                 navigator.serviceWorker.register("worker.js?bypass=1");

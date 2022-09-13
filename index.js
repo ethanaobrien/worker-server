@@ -140,7 +140,12 @@ async function setSize() {
     if (typeof navigator.storage.estimate != 'function') {
         document.getElementById('size').innerText = 'Cannot detect storage used';
     } else if (document.getElementById('size')) {
-        var size = humanFileSize((await navigator.storage.estimate()).usageDetails.indexedDB);
+        const usage = humanFileSize((await navigator.storage.estimate()).usageDetails);
+        if (!usage || !usage.indexedDB) {
+            document.getElementById('size').innerText = 'Cannot detect storage used';
+            return;
+        }
+        const size = usage.indexedDB;
         document.getElementById('size').innerText = 'Storage used: '+(size||0);
     }
 }
