@@ -1,10 +1,10 @@
-String.prototype.htmlEscape = function() {
-    return this.replaceAll(/&/g, "&amp;").replaceAll(/</g, "&lt;").replaceAll(/>/g, "&gt;").replaceAll(/"/g, "&quot;").replaceAll(/'/g, "&#039;");
-}
 if (!String.prototype.replaceAll) {
     String.prototype.replaceAll = function(a, b) {
         return this.split(a).join(b);
     }
+}
+String.prototype.htmlEscape = function() {
+    return this.replaceAll(/&/g, "&amp;").replaceAll(/</g, "&lt;").replaceAll(/>/g, "&gt;").replaceAll(/"/g, "&quot;").replaceAll(/'/g, "&#039;");
 }
 
 const storeName = 'userSiteFiles';
