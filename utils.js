@@ -3,17 +3,20 @@ if (!String.prototype.replaceAll) {
         return this.split(a).join(b);
     }
 }
+function BlobFileAB() {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            resolve(e.target.result);
+        }
+        reader.readAsArrayBuffer(this);
+    })
+}
 if (!Blob.prototype.arrayBuffer) {
-    Blob.prototype.arrayBuffer = function() {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                console.log(e.target.result)
-                resolve(e.target.result);
-            }
-            reader.readAsArrayBuffer(this);
-        })
-    }
+    Blob.prototype.arrayBuffer = BlobFileAB;
+}
+if (!File.prototype.arrayBuffer) {
+    File.prototype.arrayBuffer = BlobFileAB;
 }
 String.prototype.htmlEscape = function() {
     return this.replaceAll(/&/g, "&amp;").replaceAll(/</g, "&lt;").replaceAll(/>/g, "&gt;").replaceAll(/"/g, "&quot;").replaceAll(/'/g, "&#039;");
