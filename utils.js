@@ -3,6 +3,18 @@ if (!String.prototype.replaceAll) {
         return this.split(a).join(b);
     }
 }
+if (!Blob.prototype.arrayBuffer) {
+    Blob.prototype.arrayBuffer = function() {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                console.log(e.target.result)
+                resolve(e.target.result);
+            }
+            reader.readAsArrayBuffer(this);
+        })
+    }
+}
 String.prototype.htmlEscape = function() {
     return this.replaceAll(/&/g, "&amp;").replaceAll(/</g, "&lt;").replaceAll(/>/g, "&gt;").replaceAll(/"/g, "&quot;").replaceAll(/'/g, "&#039;");
 }
