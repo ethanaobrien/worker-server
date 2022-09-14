@@ -14,3 +14,12 @@ To load a zip from a url, the format is
 Settings can be changed at `/?bypass=1`
 
 Licenced under the GNU GENERAL PUBLIC LICENSE V3. Read the whole thing [here](LICENSE)
+
+
+
+Uses:
+
+
+[showdown](https://github.com/showdownjs/showdown)
+
+[JSZip](https://github.com/Stuk/jszip)

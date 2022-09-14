@@ -29,6 +29,8 @@
             <label for="noDirectoryListing"> No directory listing</label><br>
             <input type="checkbox" id="spa" name="spa">
             <label for="spa"> Single Page App</label><br>
+            <input type="checkbox" id="renderMarkdown" name="renderMarkdown" checked>
+            <label for="renderMarkdown"> Render Markdown Files</label><br>
             <div style="margin-left:20px;display:none;">
                 <label for="rewriteTo"> Rewrite To (for spa)</label>
                 <input type="text" id="rewriteTo" name="rewriteTo" value="/index.html" autocomplete="off"><br>
@@ -81,15 +83,16 @@
                         var res = await fetchZip(zip+'?bypass=1');
                         await submitPressed([], res, urlParams.has('deleteExisting'), urlParams.has('baseFolder'));
                         await put('opts?', {
-                            index: urlParams.has('index') || isChecked('index') || false,
-                            noDotHtml: urlParams.has('noDotHtml') || isChecked('noDotHtml') || false,
-                            put: urlParams.has('put') || isChecked('put') || false,
-                            overWrite: urlParams.has('overWrite') || isChecked('overWrite') || false,
-                            delete: urlParams.has('delete') || isChecked('delete') || false,
-                            spa: urlParams.has('spa') || isChecked('spa') || false,
-                            noDirectoryListing: urlParams.has('noDirectoryListing') || isChecked('noDirectoryListing') || false,
+                            index: (urlParams.has('index') && urlParams.get('index').toString() === 'true') || isChecked('index') || false,
+                            noDotHtml: (urlParams.has('noDotHtml') && urlParams.get('noDotHtml').toString() === 'true') || isChecked('noDotHtml') || false,
+                            put: (urlParams.has('put') && urlParams.get('put').toString() === 'true') || isChecked('put') || false,
+                            overWrite: (urlParams.has('overWrite') && urlParams.get('overWrite').toString() === 'true') || isChecked('overWrite') || false,
+                            delete: (urlParams.has('delete') && urlParams.get('delete').toString() === 'true') || isChecked('delete') || false,
+                            spa: (urlParams.has('spa') && urlParams.get('spa').toString() === 'true') || isChecked('spa') || false,
+                            noDirectoryListing: (urlParams.has('noDirectoryListing') && urlParams.get('noDirectoryListing').toString() === 'true') || isChecked('noDirectoryListing') || false,
                             rewriteTo: (urlParams.has('rewriteTo')&&decodeURIComponent(urlParams.get('rewriteTo'))) || document.getElementById('rewriteTo').value || '/index.html',
-                            rewriteRegex: (urlParams.has('rewriteRegex')&&decodeURIComponent(urlParams.get('rewriteRegex'))) || document.getElementById('rewriteRegex').value || '.*\\.[\d\\w]+$'
+                            rewriteRegex: (urlParams.has('rewriteRegex')&&decodeURIComponent(urlParams.get('rewriteRegex'))) || document.getElementById('rewriteRegex').value || '.*\\.[\d\\w]+$',
+                            renderMarkdown: (urlParams.has('renderMarkdown') && urlParams.get('renderMarkdown').toString() === 'true') || isChecked('renderMarkdown') || false
                         })
                     } catch(e) {
                         console.warn(e);

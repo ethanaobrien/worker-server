@@ -106,6 +106,9 @@ function resetDB(storeName) {
 function toArrayBuffer(data) {
     return new TextEncoder('utf-8').encode(data).buffer;
 }
+function fromArrayBuffer(data) {
+    return new TextDecoder('utf-8').decode(data);
+}
 async function updateTree(path, remove, folder) {
     var paths = await get('paths?');
     if (!paths) paths = [];

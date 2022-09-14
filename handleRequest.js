@@ -1,5 +1,5 @@
 function notFound(method) {
-    var data = '<p>Not Found</p><br><a href="/?bypass=1">Configure settings</a>';
+    let data = '<p>Not Found</p><br><a href="/?bypass=1">Configure settings</a>';
     data = toArrayBuffer(data);
     if (method === 'head') data = '';
     return new Response(data, {
@@ -117,6 +117,18 @@ async function handleRequest(e) {
     if (!res) {
         res = await get(path);
     }
+    if (res && opts.renderMarkdown && path.split('.').pop().toLowerCase === 'md') {
+        const converter = new showdown.Converter();
+        const html = converter.makeHtml(fromArrayBuffer(res.data));
+        const data = toArrayBuffer(data);
+        return new Response(data, {
+            headers: {
+                'content-type': 'text/html; charset=utf-8',
+                'content-length': data.byteLength
+            },
+            status: 200
+        });
+    }
     if (path.endsWith('/') && opts.index && !res && !spa) {
         var y = await get(path+'index.html');
         if (y) res = y;
@@ -149,8 +161,8 @@ async function handleRequest(e) {
         }
         var files = cd.children;
         files.sort(function(a, b) {
-            var anl = a.name.toLowerCase();
-            var bnl = b.name.toLowerCase();
+            const anl = a.name.toLowerCase();
+            const bnl = b.name.toLowerCase();
             if (a.isDirectory && b.isDirectory) {
                 return anl.localeCompare(bnl);
             } else if (a.isDirectory) {
@@ -161,8 +173,8 @@ async function handleRequest(e) {
                 return anl.localeCompare(bnl);
             }
         })
-        var htmlTemplate = await get('htmlTemplate?');
-        var html;
+        const htmlTemplate = await get('htmlTemplate?');
+        let html;
         if (!htmlTemplate || ['1', 'true'].includes(args.static)) {
             html = ['<html>'];
             html.push('<style>li.directory {background:#aab}</style>');
@@ -207,18 +219,18 @@ async function handleRequest(e) {
         var newpath = path.substring(0, path.length-5)+url.search;
         return new Response('', {headers: {'location':newpath,'content-length':0}, status: 307});
     }
-    var headers = {
+    let headers = {
         'accept-ranges': 'bytes',
         'content-length': res.data.byteLength
     };
     if (res.type) headers['content-type'] = res.type;
-    var code = 200;
-    var data = res.data;
+    let code = 200;
+    let data = res.data;
     if (e.request.headers['range']) {
-        var range = e.request.headers['range'].split('=')[1].trim();
-        var rparts = range.split('-');
-        var fileOffset = parseInt(rparts[0]);
-        var l = data.byteLength;
+        let range = e.request.headers['range'].split('=')[1].trim();
+        let rparts = range.split('-');
+        let fileOffset = parseInt(rparts[0]);
+        let l = data.byteLength;
         if (!rparts[1]) {
             var fileEndOffset = l - 1;
             headers['content-length'] = l - fileOffset;

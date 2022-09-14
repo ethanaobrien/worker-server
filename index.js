@@ -14,7 +14,8 @@ async function putOpts() {
         spa: isChecked('spa') || false,
         noDirectoryListing: isChecked('noDirectoryListing') || false,
         rewriteTo: document.getElementById('rewriteTo').value || '/index.html',
-        rewriteRegex: document.getElementById('rewriteRegex').value || '.*\\.[\d\\w]+$'
+        rewriteRegex: document.getElementById('rewriteRegex').value || '.*\\.[\d\\w]+$',
+        renderMD: isChecked('renderMarkdown') || false
     })
 }
 

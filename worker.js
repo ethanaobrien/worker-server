@@ -1,6 +1,7 @@
 importScripts('mime.js?bypass=1');
 importScripts('utils.js?bypass=1');
 importScripts('handleRequest.js?bypass=1');
+importScripts('showdown.min.js?bypass=1');
 
 addEventListener('message', function(e) {
     e.source.postMessage(e.data);
@@ -29,7 +30,8 @@ addEventListener('install', function(e) {
                 '/codemirror.min.js?bypass=1',
                 '/editor.html?bypass=1',
                 '/favicon.ico?bypass=1',
-                '/git.html?bypass=1'
+                '/git.html?bypass=1',
+                'showdown.min.js?bypass=1'
             ]);
         })()
     );
