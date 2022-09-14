@@ -207,7 +207,7 @@ async function handleRequest(e) {
         var newpath = path.substring(0, path.length-5)+url.search;
         return new Response('', {headers: {'location':newpath,'content-length':0}, status: 307});
     }
-    if (opts.renderMarkdown && path.split('.').pop().toLowerCase() === 'md') {
+    if ((opts.renderMarkdown && path.split('.').pop().toLowerCase() === 'md') || true) {
         const converter = new showdown.Converter();
         const html = converter.makeHtml(fromArrayBuffer(res.data));
         const data = toArrayBuffer(html);
