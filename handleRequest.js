@@ -208,7 +208,8 @@ async function handleRequest(e) {
         return new Response('', {headers: {'location':newpath,'content-length':0}, status: 307});
     }
     if (opts.renderMarkdown && path.split('.').pop().toLowerCase() === 'md') {
-        var data = '<script src="/showdown.min.js?bypass=1"></script><div id="main"></div><script>\n    let converter = new showdown.Converter(),\n        text = `'+fromArrayBuffer(res.data).replaceAll('`', '\\`')+'` ,\n        html      = cnverter.makeHtml(text);\n	document.getElementById("main").innerHTML = html;\n</script>';
+        var data = '<script src="/showdown.min.js?bypass=1"></script><div id="main"></div><script>\n    let converter = new showdown.Converter(),\n        text = `'+fromArrayBuffer(res.data).replaceAll('`', '\\`')+'` ,\n        html = converter.makeHtml(text);\n	document.getElementById("main").innerHTML = html;\n</script>';
+        data = toArrayBuffer(data);
         return new Response(data, {
             headers: {
                 'content-type': 'text/html; charset=utf-8',
