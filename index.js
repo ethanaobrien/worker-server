@@ -15,7 +15,7 @@ async function putOpts() {
         noDirectoryListing: isChecked('noDirectoryListing') || false,
         rewriteTo: document.getElementById('rewriteTo').value || '/index.html',
         rewriteRegex: document.getElementById('rewriteRegex').value || '.*\\.[\d\\w]+$',
-        renderMD: isChecked('renderMarkdown') || false
+        renderMarkdown: isChecked('renderMarkdown') || false
     })
 }
 
