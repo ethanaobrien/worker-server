@@ -208,11 +208,7 @@ async function handleRequest(e) {
         return new Response('', {headers: {'location':newpath,'content-length':0}, status: 307});
     }
     if (opts.renderMarkdown && path.split('.').pop().toLowerCase() === 'md') {
-        
-        const converter = new showdown.Converter({completeHTMLDocument:true});
-        const html = converter.makeHtml(fromArrayBuffer(res.data));
-        const data = toArrayBuffer(html);
-        const data = '<script src="showdown.min.js?bypass=1"></script><div id="main"></div><script>\n    let converter = new showdown.Converter(),\n        text = `'+fromArrayBuffer(res.data).replaceAll('`', '\\`')+'` ,\n        html      = cnverter.makeHtml(text);\n	document.getElementById("main").innerHTML = html;\n</script>`;
+        var data = '<script src="showdown.min.js?bypass=1"></script><div id="main"></div><script>\n    let converter = new showdown.Converter(),\n        text = `'+fromArrayBuffer(res.data).replaceAll('`', '\\`')+'` ,\n        html      = cnverter.makeHtml(text);\n	document.getElementById("main").innerHTML = html;\n</script>';
         return new Response(data, {
             headers: {
                 'content-type': 'text/html; charset=utf-8',
@@ -227,7 +223,7 @@ async function handleRequest(e) {
     };
     if (res.type) headers['content-type'] = res.type;
     let code = 200;
-    let data = res.data;
+    var data = res.data;
     if (e.request.headers['range']) {
         let range = e.request.headers['range'].split('=')[1].trim();
         let rparts = range.split('-');
