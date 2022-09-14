@@ -117,18 +117,6 @@ async function handleRequest(e) {
     if (!res) {
         res = await get(path);
     }
-    if (res && opts.renderMarkdown && path.split('.').pop().toLowerCase === 'md') {
-        const converter = new showdown.Converter();
-        const html = converter.makeHtml(fromArrayBuffer(res.data));
-        const data = toArrayBuffer(data);
-        return new Response(data, {
-            headers: {
-                'content-type': 'text/html; charset=utf-8',
-                'content-length': data.byteLength
-            },
-            status: 200
-        });
-    }
     if (path.endsWith('/') && opts.index && !res && !spa) {
         var y = await get(path+'index.html');
         if (y) res = y;
@@ -218,6 +206,18 @@ async function handleRequest(e) {
     if (opts.noDotHtml && path.endsWith('.html') && !spa) {
         var newpath = path.substring(0, path.length-5)+url.search;
         return new Response('', {headers: {'location':newpath,'content-length':0}, status: 307});
+    }
+    if (path.split('.').pop().toLowerCase === 'md') {
+        const converter = new showdown.Converter();
+        const html = converter.makeHtml(fromArrayBuffer(res.data));
+        const data = toArrayBuffer(html);
+        return new Response(data, {
+            headers: {
+                'content-type': 'text/html; charset=utf-8',
+                'content-length': data.byteLength
+            },
+            status: 200
+        });
     }
     let headers = {
         'accept-ranges': 'bytes',
