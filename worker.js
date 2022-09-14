@@ -1,7 +1,6 @@
 importScripts('mime.js?bypass=1');
 importScripts('utils.js?bypass=1');
 importScripts('handleRequest.js?bypass=1');
-importScripts('showdown.min.js?bypass=1');
 
 addEventListener('message', function(e) {
     e.source.postMessage(e.data);
