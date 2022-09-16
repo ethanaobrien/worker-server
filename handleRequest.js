@@ -207,7 +207,7 @@ async function handleRequest(e) {
         var newpath = path.substring(0, path.length-5)+url.search;
         return new Response('', {headers: {'location':newpath,'content-length':0}, status: 307});
     }
-    if (opts.renderMarkdown && path.split('.').pop().toLowerCase() === 'md' && !['1', 'true'].includes(args.raw.toString())) {
+    if (opts.renderMarkdown && path.split('.').pop().toLowerCase() === 'md' && !['1', 'true'].includes((args.raw||'').toString())) {
         var data = '<script src="/showdown.min.js?bypass=1"></scr'+'ipt><div id="main"></div><script>!async function(){let t=new showdown.Converter,a=await (await fetch(window.location.pathname+"?raw=1")).text(),e=t.makeHtml(a);document.getElementById("main").innerHTML=e}();</sc'+'ript>';
         data = toArrayBuffer(data);
         return new Response(data, {
