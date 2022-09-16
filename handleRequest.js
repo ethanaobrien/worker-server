@@ -207,8 +207,8 @@ async function handleRequest(e) {
         var newpath = path.substring(0, path.length-5)+url.search;
         return new Response('', {headers: {'location':newpath,'content-length':0}, status: 307});
     }
-    if (opts.renderMarkdown && path.split('.').pop().toLowerCase() === 'md') {
-        var data = '<script src="/showdown.min.js?bypass=1"></script><div id="main"></div><script>\n    let converter = new showdown.Converter(),\n        text = `'+fromArrayBuffer(res.data).replaceAll('`', '\\`')+'` ,\n        html = converter.makeHtml(text);\n	document.getElementById("main").innerHTML = html;\n</script>';
+    if (opts.renderMarkdown && path.split('.').pop().toLowerCase() === 'md' && !['1', 'true'].includes(args.raw.toString())) {
+        var data = '<script src="/showdown.min.js?bypass=1"></script>\n<div id="main"></div>\n<script>\n(async function() {\n    let converter = new showdown.Converter(),\n    text = await (await fetch(window.location.pathname+"?raw=1")).text(),\n    html = converter.makeHtml(text);\n    document.getElementById("main").innerHTML = html;\n})();\n</script>';
         data = toArrayBuffer(data);
         return new Response(data, {
             headers: {
