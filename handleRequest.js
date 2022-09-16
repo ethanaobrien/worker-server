@@ -208,7 +208,7 @@ async function handleRequest(e) {
         return new Response('', {headers: {'location':newpath,'content-length':0}, status: 307});
     }
     if (opts.renderMarkdown && path.split('.').pop().toLowerCase() === 'md' && !['1', 'true'].includes(args.raw.toString())) {
-        var data = '<script src="/showdown.min.js?bypass=1"></script>\n<div id="main"></div>\n<script>\n(async function() {\n    let converter = new showdown.Converter(),\n    text = await (await fetch(window.location.pathname+"?raw=1")).text(),\n    html = converter.makeHtml(text);\n    document.getElementById("main").innerHTML = html;\n})();\n</script>';
+        var data = '<script src="/showdown.min.js?bypass=1"></scr'+'ipt><div id="main"></div><script>!async function(){let t=new showdown.Converter,a=await (await fetch(window.location.pathname+"?raw=1")).text(),e=t.makeHtml(a);document.getElementById("main").innerHTML=e}();</sc'+'ript>';
         data = toArrayBuffer(data);
         return new Response(data, {
             headers: {
